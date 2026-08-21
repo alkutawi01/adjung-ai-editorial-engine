@@ -760,7 +760,7 @@ $('exportBtn').onclick = () => {
   const finalUnits = (doc?.units || []).filter(u => u.final);
   if(!finalUnits.length){ $('backupMsg').textContent = 'No FINAL units to export yet.'; return; }
   downloadJson({
-    fileName: doc.fileName, targetLang: doc.targetLang, bookProfile: doc.bookProfile,
+    fileName: doc.fileName, sourceLang: doc.sourceLang, targetLang: doc.targetLang, bookProfile: doc.bookProfile,
     exportedAt: new Date().toISOString(),
     units: finalUnits.map(u => ({
       id: u.id, chapter: u.chapter, source: u.source,
