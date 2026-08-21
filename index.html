@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Adjung · Translation Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand"><span class="brand-word">Adjung</span><span class="brand-sub">TRANSLATION ENGINE</span></div>
+    <div class="topbar-right"><span id="savedState" class="saved">● Saved locally</span></div>
+  </header>
+
+  <section id="uploadScreen" class="upload-screen">
+    <div class="upload-card">
+      <h1>Upload manuscript (.docx)</h1>
+      <p class="hint">The system splits the text into small units automatically, roughly two paragraphs each.</p>
+      <input type="file" id="fileInput" accept=".docx" hidden>
+      <button class="primary-button" id="chooseFileBtn">Choose .docx file</button>
+      <p id="fileName" class="file-name"></p>
+      <p id="uploadError" class="upload-error" role="alert"></p>
+    </div>
+  </section>
+
+  <div id="workspace" class="workspace-wrap" hidden>
+    <nav class="phase-nav" id="phaseNav">
+      <button class="phase-tab active" data-phase="scan"><span class="phase-num">1</span><span class="phase-name">Book Scan</span><span class="phase-badge" id="badgeScan"></span></button>
+      <button class="phase-tab" data-phase="parafrasa"><span class="phase-num">2</span><span class="phase-name">Paraphrase</span><span class="phase-badge" id="badgeParaphrase"></span></button>
+      <button class="phase-tab" data-phase="translation"><span class="phase-num">3</span><span class="phase-name">Translation</span><span class="phase-badge" id="badgeTranslation"></span></button>
+      <button class="phase-tab" data-phase="backtranslation"><span class="phase-num">4</span><span class="phase-name">Back Translation</span><span class="phase-badge" id="badgeBack"></span></button>
+      <button class="phase-tab" data-phase="final"><span class="phase-num">5</span><span class="phase-name">Final Review</span><span class="phase-badge" id="badgeFinal"></span></button>
+    </nav>
+
+    <div class="workspace">
+      <aside class="sidebar">
+        <div class="sidebar-section">
+          <div id="docSummary"></div>
+          <div class="book-switch-row">
+            <select id="bookSwitcher" hidden></select>
+            <button class="text-button" id="reuploadBtn">Upload another book…</button>
+          </div>
+        </div>
+
+        <div class="phase-tools" id="toolsScan">
+          <p class="phase-intro">Send the whole book to your chatbot once, so it can describe the voice, style and risky terms before any unit work begins.</p>
+          <div class="sidebar-section">
+            <h2>Step A · Copy this prompt</h2>
+            <p class="hint-small">Send it to your chatbot together with the full .docx file.</p>
+            <textarea id="bookScanPromptOut" class="prompt-out" readonly></textarea>
+            <button class="copy-button" id="copyBookScanBtn">▣ Copy prompt</button>
+          </div>
+          <div class="sidebar-section">
+            <h2>Step B · Paste the reply</h2>
+            <textarea id="bookProfilePasteIn" class="paste-in" placeholder="Paste the chatbot's Book Profile here…"></textarea>
+            <button class="primary-button" id="processBookProfileBtn">Process Book Profile →</button>
+            <p id="bookProfileError" class="upload-error" role="alert"></p>
+          </div>
+        </div>
+
+        <div class="phase-tools" id="toolsBatch" hidden>
+          <p class="phase-intro" id="phaseIntro"></p>
+          <div class="sidebar-section" id="sourceLangSection" hidden>
+            <h2>Manuscript's source language <span class="required-mark">required</span></h2>
+            <p class="hint-small">Not detected automatically. This is what the paraphrase prompt tells the chatbot to write in.</p>
+            <input type="text" id="sourceLangInput" placeholder="e.g. Malay, English…">
+          </div>
+          <div class="sidebar-section" id="targetLangSection" hidden>
+            <h2>Target language <span class="required-mark">required</span></h2>
+            <input type="text" id="targetLangInput" placeholder="e.g. English, Arabic…">
+          </div>
+          <details class="sidebar-section step-section" id="decisionMemorySection">
+            <summary><h2>Decision Memory <span id="dmCount" class="unit-status none">0</span></h2></summary>
+            <p class="hint-small">Approved rulings on terms and style. Only entries whose term appears in the selected units are added to the prompt.</p>
+            <div class="dm-add-row">
+              <input type="text" id="dmTermInput" placeholder="Term (e.g. tawaqquf)">
+              <textarea id="dmDecisionInput" class="dm-decision-input" placeholder="Ruling (e.g. keep the Arabic term, never translate it)" rows="2"></textarea>
+              <button class="primary-button" id="dmAddBtn">+ Add ruling</button>
+            </div>
+            <div id="dmList" class="dm-list"></div>
+          </details>
+          <div class="sidebar-section">
+            <h2>Step A · Pick units</h2>
+            <input type="search" id="unitSearch" placeholder="Search text or unit ID…">
+            <div class="select-row">
+              <button class="text-button" id="selectAllBtn">Select all filtered</button>
+              <button class="text-button" id="selectNoneBtn">Clear</button>
+            </div>
+            <p id="selectedCount" class="selected-count">0 selected</p>
+            <p id="batchWarning" class="batch-warning" role="status"></p>
+          </div>
+          <div class="sidebar-section grow">
+            <h2>Step B · Copy prompt</h2>
+            <textarea id="promptOut" class="prompt-out" readonly placeholder="Pick units on the right to build a prompt…"></textarea>
+            <button class="copy-button" id="copyPromptBtn">▣ Copy prompt</button>
+          </div>
+          <div class="sidebar-section">
+            <h2>Step C · Paste the reply</h2>
+            <textarea id="pasteIn" class="paste-in" placeholder="Paste the chatbot's full reply here…"></textarea>
+            <button class="primary-button" id="processBtn">Process &amp; Save →</button>
+            <p id="parseError" class="upload-error" role="alert"></p>
+            <p id="parseSuccess" class="parse-success" role="status"></p>
+          </div>
+        </div>
+
+        <div class="phase-tools" id="toolsFinal" hidden>
+          <p class="phase-intro">Read all four versions of a unit side by side. Mark it FINAL only when the meaning holds.</p>
+          <div class="sidebar-section">
+            <h2>Export</h2>
+            <p class="hint-small">Only units you marked FINAL are included.</p>
+            <button class="primary-button" id="exportBtn">⬇ Export FINAL units (.json)</button>
+          </div>
+          <div class="sidebar-section">
+            <h2>Backup</h2>
+            <p class="hint-small">Saves every book and all in-progress work. Keep a copy outside the browser.</p>
+            <button class="copy-button" id="backupBtn">⬇ Download full backup</button>
+            <input type="file" id="restoreInput" accept=".json" hidden>
+            <button class="text-button" id="restoreBtn">Restore from backup…</button>
+            <p id="backupMsg" class="parse-success" role="status"></p>
+          </div>
+        </div>
+      </aside>
+
+      <section class="unit-panel">
+        <div class="unit-panel-head">
+          <h2 id="panelTitle">Manuscript units</h2>
+          <div class="filter-row" id="filterRow">
+            <select id="statusFilter"></select>
+            <select id="chapterFilter"><option value="">All sections</option></select>
+          </div>
+        </div>
+        <div id="bookProfilePanel" hidden>
+          <div id="bookProfileFields" class="bp-fields"></div>
+          <div class="unit-actions" id="bookProfileActions"></div>
+        </div>
+        <div id="unitList" class="unit-list"></div>
+      </section>
+    </div>
+  </div>
+</div>
+<script src="./docx-reader.js"></script>
+<script src="./app.js"></script>
+</body></html>
