@@ -564,11 +564,16 @@ $('clearSentBtn').onclick = () => {
 };
 
 // ---- Prompts -----------------------------------------------------------------
+// The profile is background for the chatbot, never material to draw from. Without saying so
+// explicitly, a chatbot will lift vocabulary out of the Key terms list and work it into units
+// where the author never used it — observed in production on a fiqh manuscript, where three
+// technical terms appeared in a paraphrase of a passage that contained none of them. In a legal
+// or religious text that shifts what the passage actually claims.
 function bookProfileBlockFor(){
   const bp = doc?.bookProfile;
   if(!bp || bp.status !== 'approved' || !bp.fields) return '';
   const lines = BOOK_PROFILE_FIELDS.filter(f => bp.fields[f.key]).map(f => `${f.label}: ${bp.fields[f.key]}`).join('\n');
-  return `\nBOOK PROFILE (approved context. Respect the author's voice, key terms, and risks noted here):\n${lines}\n`;
+  return `\nBOOK PROFILE (background context only. It tells you what kind of book this is so you can judge tone and terminology. It is NOT source material: never insert a term, name, or idea from this profile into a unit unless that unit's own text already contains it. In particular, the Key terms list is a glossary of what MAY appear in the book, not a list of words to add.):\n${lines}\n`;
 }
 function memoryBlockFor(combinedText){
   const rel = relevantDecisionMemory(combinedText);
