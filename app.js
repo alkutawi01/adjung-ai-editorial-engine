@@ -432,7 +432,7 @@ function renderStatusFilterOptions(){
   const sel = $('statusFilter');
   const current = sel.value;
   const noneLabel = { parafrasa: 'No paraphrase yet', translation: 'No translation yet', backtranslation: 'No back translation yet' }[mode];
-  const options = [['', 'All statuses'], ['none', noneLabel], ['pending', 'Awaiting review'], ['approved', 'Approved'], ['rejected', 'Rejected']];
+  const options = [['', 'All statuses'], ['none', noneLabel], ['sent', 'Sent — awaiting reply'], ['pending', 'Awaiting review'], ['approved', 'Approved'], ['rejected', 'Rejected']];
   sel.innerHTML = options.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
   if(options.some(([v]) => v === current)) sel.value = current;
 }
@@ -531,8 +531,34 @@ function renderUnitList(){
 
 function statusLabel(s){
   const noneLabel = { parafrasa: 'No paraphrase yet', translation: 'No translation yet', backtranslation: 'No back translation yet' }[mode];
-  return { none: noneLabel, pending: 'Awaiting review', approved: 'Approved', rejected: 'Rejected' }[s] || s;
+  return { none: noneLabel, sent: 'Sent — awaiting reply', pending: 'Awaiting review', approved: 'Approved', rejected: 'Rejected' }[s] || s;
 }
+
+// A prompt can be copied and handed to a chatbot without the app ever knowing whether that
+// chatbot actually received it — the browser-side send can fail silently. Marking units "sent"
+// the moment their prompt is copied gives the editor a visible trail of what's outstanding, so a
+// stalled or duplicate send is something the app surfaces instead of something only a human
+// happens to remember.
+function minutesAgo(iso){
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if(mins < 1) return 'just now';
+  if(mins === 1) return '1 minute ago';
+  if(mins < 60) return `${mins} minutes ago`;
+  const hrs = Math.round(mins / 60);
+  return hrs === 1 ? '1 hour ago' : `${hrs} hours ago`;
+}
+function renderSentBanner(){
+  if(!BATCH_PHASES.includes(phase)){ $('sentBannerSection').hidden = true; return; }
+  const sentUnits = (doc?.units || []).filter(u => workField(u).status === 'sent');
+  if(!sentUnits.length){ $('sentBannerSection').hidden = true; return; }
+  $('sentBannerSection').hidden = false;
+  const oldest = sentUnits.reduce((a, b) => new Date(workField(a).sentAt) < new Date(workField(b).sentAt) ? a : b);
+  $('sentBanner').textContent = `⏳ ${sentUnits.length} unit(s) sent (${sentUnits.map(u => u.id).join(', ')}) — oldest ${minutesAgo(workField(oldest).sentAt)}, no reply processed yet. Don't resend unless the send genuinely failed.`;
+}
+$('clearSentBtn').onclick = () => {
+  (doc?.units || []).forEach(u => { if(workField(u).status === 'sent'){ workField(u).status = 'none'; workField(u).sentAt = null; } });
+  save(); renderAll();
+};
 
 // ---- Prompts -----------------------------------------------------------------
 function bookProfileBlockFor(){
@@ -662,6 +688,7 @@ function renderAll(){
   renderPhaseNav();
   renderChapterFilter();
   renderDocSummary();
+  renderSentBanner();
   renderUnitList();
   renderPrompt();
 }
@@ -851,7 +878,17 @@ $('restoreInput').onchange = async (e) => {
 };
 
 // ---- Copy & paste ------------------------------------------------------------
-$('copyPromptBtn').onclick = () => copyWithFeedback($('promptOut'), $('copyPromptBtn'));
+$('copyPromptBtn').onclick = async () => {
+  await copyWithFeedback($('promptOut'), $('copyPromptBtn'));
+  const sentIds = [...selected];
+  if(sentIds.length){
+    const now = new Date().toISOString();
+    doc.units.filter(u => selected.has(u.id)).forEach(u => { workField(u).status = 'sent'; workField(u).sentAt = now; });
+    selected.clear();
+    save();
+    renderAll();
+  }
+};
 
 function extractLabeled(chunk, label){
   const m = chunk.match(new RegExp(`\\[${label}\\]([\\s\\S]*?)(?=\\n\\[[A-Z_]+\\]|$)`, 'i'));
