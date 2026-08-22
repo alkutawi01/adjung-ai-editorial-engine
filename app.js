@@ -136,9 +136,21 @@ function buildUnitsFromParagraphs(paragraphs){
 // ---- Upload -----------------------------------------------------------------
 $('chooseFileBtn').onclick = () => $('fileInput').click();
 $('reuploadBtn').onclick = () => { $('fileInput').value=''; $('fileInput').click(); };
-$('fileInput').onchange = async (e) => {
-  const file = e.target.files[0];
-  if(!file) return;
+$('fileInput').onchange = (e) => { const file = e.target.files[0]; if(file) handleUploadedFile(file); };
+
+// Drag-and-drop, not just click-to-browse — a document tool that only accepts clicks feels
+// a full generation behind what people expect from paid software in this category.
+const dropZone = $('uploadScreen');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', e => { if(e.target === dropZone) dropZone.classList.remove('drag-over'); });
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer?.files?.[0];
+  if(file) handleUploadedFile(file);
+});
+
+async function handleUploadedFile(file){
   $('uploadError').textContent = '';
   $('fileName').textContent = `Processing ${file.name}…`;
   try{
@@ -179,7 +191,7 @@ $('fileInput').onchange = async (e) => {
     $('uploadError').textContent = 'Error: ' + err.message;
     $('fileName').textContent = '';
   }
-};
+}
 
 $('bookSwitcher').onchange = () => {
   const name = $('bookSwitcher').value;
@@ -909,6 +921,15 @@ $('restoreInput').onchange = async (e) => {
   try{
     const parsed = JSON.parse(await file.text());
     if(!parsed || !parsed.books) throw new Error('Not an Adjung backup file.');
+    // This replaces every book currently in the browser, not just the active one. Without a
+    // confirmation, picking the wrong backup file silently destroys everything in one click
+    // with no undo — the single most destructive action anywhere in the app deserves one.
+    const currentCount = Object.keys(library.books || {}).length;
+    const incomingCount = Object.keys(parsed.books).length;
+    const warning = currentCount
+      ? `Restoring will REPLACE all ${currentCount} book(s) currently in this browser with the ${incomingCount} book(s) in "${file.name}". Anything not backed up separately will be lost. This cannot be undone.\n\nContinue?`
+      : `Restore ${incomingCount} book(s) from "${file.name}"?`;
+    if(!confirm(warning)){ $('restoreInput').value = ''; return; }
     library = parsed;
     Object.values(library.books).forEach(normalizeDoc);
     doc = library.activeFile ? library.books[library.activeFile] : Object.values(library.books)[0] || null;

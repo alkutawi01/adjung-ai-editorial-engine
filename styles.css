@@ -115,10 +115,13 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 #bookProfilePanel .unit-actions{margin-top:16px}
 
 /* ---- Upload screen ---------------------------------------------------------- */
-.upload-screen{flex:1;display:grid;place-items:center;padding:40px}
-.upload-card{max-width:440px;text-align:center;padding:40px 36px;border:1px solid var(--line);border-radius:var(--r-lg);background:#fff;box-shadow:var(--shadow-lg)}
+.upload-screen{flex:1;display:grid;place-items:center;padding:40px;border:2px dashed transparent;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease)}
+.upload-screen.drag-over{background:var(--maroon-tint);border-color:var(--maroon)}
+.upload-card{max-width:440px;text-align:center;padding:40px 36px;border:1px solid var(--line);border-radius:var(--r-lg);background:#fff;box-shadow:var(--shadow-lg);pointer-events:none}
+.upload-card *{pointer-events:auto}
 .upload-card h1{margin:0 0 10px;font-size:22px}
 .upload-card .hint{color:var(--muted);font-size:12px;line-height:1.6;margin-bottom:20px}
+.drop-hint{margin:10px 0 0;color:var(--faint);font-size:11px}
 .file-name{margin-top:12px;font-size:12px;color:var(--muted)}
 .upload-error{margin-top:10px;color:var(--error);font-size:12px;min-height:14px}
 
