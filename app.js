@@ -35,8 +35,11 @@ let editingUnitId = null;
 // 87 units built a 51KB prompt in testing). Two independent caps, whichever is hit first wins:
 // characters (raw prompt size) and sentences (how much a human reviewer can hold in their head
 // per round). Sentence counting is approximate — it only has to be a reasonable proxy, not exact.
-const BATCH_MAX_CHARS = 6000;
-const BATCH_MAX_SENTENCES = 60;
+// Raised from an initial 6000/60 after real production use on a 52-unit chapter showed the
+// review bottleneck was chatbot round-trips, not reviewer attention span — chatbots handle prompts
+// this size natively, and a bigger batch means fewer copy/paste/wait cycles per phase.
+const BATCH_MAX_CHARS = 12000;
+const BATCH_MAX_SENTENCES = 100;
 function countSentences(text){ return Math.max(1, (text.match(/[.!?…]+(\s|$)/g) || []).length); }
 function batchStatsFor(units){
   return units.reduce((acc, u) => ({ chars: acc.chars + u.source.length, sentences: acc.sentences + countSentences(u.source) }), { chars: 0, sentences: 0 });
@@ -640,7 +643,10 @@ function renderPrompt(){
   const sel = (doc?.units || []).filter(u => selected.has(u.id));
   const stats = batchStatsFor(sel);
   $('selectedCount').textContent = `${sel.length} selected · ${stats.chars}/${BATCH_MAX_CHARS} chars · ${stats.sentences}/${BATCH_MAX_SENTENCES} sentences`;
-  if(!sel.length){ $('promptOut').value = ''; return; }
+  // Marking a batch "sent" clears the selection, but blanking the prompt with it would strand an
+  // editor whose clipboard copy failed or who needs to paste it a second time. The last prompt
+  // stays on screen until a new selection replaces it.
+  if(!sel.length) return;
   if(mode === 'parafrasa' && !(doc?.sourceLang || '').trim()){
     $('promptOut').value = "Fill in the manuscript's source language above before a paraphrase prompt can be built.";
     return;
@@ -717,7 +723,7 @@ $('selectAllBtn').onclick = () => {
   if(skipped) $('batchWarning').textContent = `Batch limit reached (${BATCH_MAX_CHARS} chars / ${BATCH_MAX_SENTENCES} sentences) — ${skipped} unit(s) left unselected. Process this batch, then select more.`;
   renderUnitList(); renderPrompt();
 };
-$('selectNoneBtn').onclick = () => { selected.clear(); $('batchWarning').textContent = ''; renderUnitList(); renderPrompt(); };
+$('selectNoneBtn').onclick = () => { selected.clear(); $('batchWarning').textContent = ''; $('promptOut').value = ''; renderUnitList(); renderPrompt(); };
 $('unitList').addEventListener('change', e => {
   const cb = e.target.closest('input[data-select]');
   if(!cb) return;
@@ -915,6 +921,23 @@ $('processBtn').onclick = () => {
   if(!Object.keys(chunks).length){ $('parseError').textContent = 'No [UNIT: id] markers found. Make sure the chatbot kept the requested format.'; return; }
   const fieldLabel = { parafrasa: 'PARAPHRASE', translation: 'TRANSLATION', backtranslation: 'BACK_TRANSLATION' }[mode];
   const targetField = PHASES[mode].field;
+
+  // A chatbot can cut out mid-reply and still return something that parses — the first unit, or a
+  // bare "[UNIT: U0001]" with no body. Silently accepting that leaves the rest of the batch blank
+  // and looking merely "not started", so a truncated answer is refused before anything is written.
+  const outstanding = doc.units.filter(u => u[targetField].status === 'sent');
+  if(outstanding.length){
+    const answered = outstanding.filter(u => {
+      const chunk = chunks[u.id];
+      return chunk && extractLabeled(chunk, fieldLabel);
+    });
+    if(answered.length < outstanding.length){
+      const missing = outstanding.filter(u => !answered.includes(u)).map(u => u.id);
+      $('parseError').textContent = `Incomplete reply: ${answered.length} of ${outstanding.length} sent unit(s) answered. Missing ${missing.join(', ')}. The chatbot likely cut out — send the batch again rather than accepting a partial answer. Nothing was saved.`;
+      return;
+    }
+  }
+
   let applied = 0, unknown = [];
   Object.entries(chunks).forEach(([id, chunk]) => {
     const u = doc.units.find(x => x.id === id);
