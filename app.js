@@ -223,8 +223,9 @@ function renderBookProfilePanel(){
   const fieldsHtml = BOOK_PROFILE_FIELDS.map(f => {
     const val = (bp.fields && bp.fields[f.key]) || '';
     const over = val.length > f.max;
+    const title = over ? `title="The chatbot ran a little long here. Not an error — shorter just keeps every field skimmable and consistent across the book. Edit the field if you want to trim it."` : '';
     return `<div class="bp-field">
-      <div class="bp-field-head"><small>${escapeHtml(f.label)}</small><span class="bp-field-count${over ? ' over' : ''}">${val.length}/${f.max}</span></div>
+      <div class="bp-field-head"><small>${escapeHtml(f.label)}</small><span class="bp-field-count${over ? ' over' : ''}" ${title}>${val.length}/${f.max}</span></div>
       ${val ? `<p dir="auto">${escapeHtml(val)}</p>` : '<p class="bp-field-empty">Not provided by the chatbot.</p>'}
     </div>`;
   }).join('');
