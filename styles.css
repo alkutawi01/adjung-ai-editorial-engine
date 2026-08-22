@@ -80,7 +80,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .shell{min-height:100vh;display:flex;flex-direction:column}
 
 /* ---- Topbar --------------------------------------------------------------- */
-.topbar{height:60px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,var(--maroon) 0%,var(--maroon-dark) 100%);color:#fff;box-shadow:var(--shadow-sm);position:relative;z-index:5}
+.topbar{height:60px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;background:var(--maroon);color:#fff;box-shadow:var(--shadow-sm);position:relative;z-index:5}
 .brand{display:flex;align-items:baseline;gap:9px}
 .brand-word{font:400 21px var(--font-serif);letter-spacing:.01em}
 .brand-sub{font:600 10px var(--font-sans);letter-spacing:.18em;color:#f4dce0b3;text-transform:uppercase}
@@ -121,9 +121,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
    workflow action), text (bare label), approve/reject (semantic outline/fill).
    All share the same transition curve and a pressed state so the UI never feels
    like it's just swallowing clicks. */
-.primary-button,.copy-button{border:0;border-radius:var(--r-md);background:var(--maroon);color:#fff;font:600 12px var(--font-sans);cursor:pointer;box-shadow:var(--shadow-maroon);transition:background var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease),box-shadow var(--dur-fast) var(--ease)}
-.primary-button{padding:11px 20px}
-.copy-button{width:100%;margin-top:8px;padding:10px;font-size:11px}
+/* primary-button and copy-button are the same visual weight — same height, same type
+   scale — so that any two of them sitting next to or above one another (e.g. the two
+   Export buttons) read as a matched set instead of two different components that
+   happened to end up in the same place. */
+.primary-button,.copy-button{display:block;width:100%;border:0;border-radius:var(--r-md);background:var(--maroon);color:#fff;font:600 12px var(--font-sans);cursor:pointer;box-shadow:var(--shadow-maroon);padding:11px 20px;transition:background var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease),box-shadow var(--dur-fast) var(--ease)}
+.copy-button{margin-top:8px}
 .primary-button:hover,.copy-button:hover{background:var(--maroon-dark);box-shadow:0 4px 14px rgba(128,35,52,.32)}
 .primary-button:active,.copy-button:active{transform:translateY(1px);box-shadow:var(--shadow-xs)}
 .primary-button:disabled,.copy-button:disabled{opacity:.5;cursor:not-allowed;box-shadow:none;transform:none}
@@ -169,7 +172,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .filter-row select:hover{border-color:var(--faint)}
 .single-card-toggle{display:flex;align-items:center;gap:5px;font:12px var(--font-sans);color:var(--muted);white-space:nowrap;cursor:pointer;user-select:none}
 .single-card-toggle input{accent-color:var(--maroon)}
-.single-card-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 var(--sp-4);padding:9px 14px;border:1px solid var(--line);border-radius:var(--r-md);background:linear-gradient(180deg,#fff,var(--paper));font:12px var(--font-sans);box-shadow:var(--shadow-xs)}
+.single-card-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 var(--sp-4);padding:9px 14px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--paper);font:12px var(--font-sans);box-shadow:var(--shadow-xs)}
 .single-card-nav button:disabled{opacity:.35;cursor:default}
 .single-card-nav #singleCardPos{font:600 11px var(--font-mono);color:var(--muted);letter-spacing:.02em}
 
