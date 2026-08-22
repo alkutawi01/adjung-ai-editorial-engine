@@ -769,6 +769,63 @@ $('exportBtn').onclick = () => {
   }, `${doc.fileName.replace(/\.docx$/i, '')}-final.json`);
 };
 
+// Builds a Word-openable .doc file entirely client-side, no external library or network call:
+// Word reads HTML wrapped in its own XML namespace just as reliably as a real .docx. This keeps
+// the export self-contained and offline, matching how the rest of the app already works.
+function buildReadableWordDoc(finalUnits, titleLine, subtitleLine){
+  const byChapter = new Map();
+  finalUnits.forEach(u => {
+    if(!byChapter.has(u.chapter)) byChapter.set(u.chapter, []);
+    byChapter.get(u.chapter).push(u);
+  });
+
+  const chapterHtml = [...byChapter.entries()].map(([chapter, units]) => {
+    const body = units.map(u => {
+      const text = (u.translation.text || '').trim();
+      if(!text) return '';
+      return text.split(/\n\s*\n/).map(p => {
+        const clean = escapeHtml(p.replace(/\n/g, ' ').trim());
+        return clean ? `<p style="margin:0 0 12pt 0;text-indent:24pt;text-align:justify;">${clean}</p>` : '';
+      }).join('');
+    }).join('');
+    return `<h1 style="font-size:16pt;margin:24pt 0 18pt 0;">${escapeHtml(chapter)}</h1>${body}`;
+  }).join('<br clear="all" style="page-break-before:always">');
+
+  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><title>${escapeHtml(titleLine)}</title>
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
+<style>body{font-family:Calibri,Georgia,serif;font-size:12pt;line-height:1.5;} h1{font-family:Calibri,Arial,sans-serif;}</style>
+</head>
+<body>
+<div style="text-align:center;margin-bottom:48pt;">
+  <h1 style="font-size:26pt;margin-bottom:6pt;">${escapeHtml(titleLine)}</h1>
+  <p style="font-style:italic;color:#555;">${escapeHtml(subtitleLine)}</p>
+</div>
+${chapterHtml}
+</body></html>`;
+}
+
+$('exportDocBtn').onclick = () => {
+  const finalUnits = (doc?.units || []).filter(u => u.final).sort((a, b) => a.id.localeCompare(b.id));
+  if(!finalUnits.length){ $('exportDocMsg').textContent = 'No FINAL units to export yet.'; return; }
+  const missingTranslation = finalUnits.filter(u => !u.translation.text?.trim());
+  if(missingTranslation.length){
+    $('exportDocMsg').textContent = `${missingTranslation.length} FINAL unit(s) have no translation text — export stopped so nothing is silently blank.`;
+    return;
+  }
+  const titleLine = doc.fileName.replace(/\.docx$/i, '');
+  const subtitleLine = `${doc.targetLang || 'Translation'} — exported ${new Date().toLocaleDateString()}`;
+  const html = buildReadableWordDoc(finalUnits, titleLine, subtitleLine);
+  const blob = new Blob(['﻿', html], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${titleLine} - ${doc.targetLang || 'Translation'}.doc`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  $('exportDocMsg').textContent = `✓ Document downloaded (${finalUnits.length} unit(s)).`;
+  setTimeout(() => { $('exportDocMsg').textContent = ''; }, 4000);
+};
+
 $('backupBtn').onclick = () => {
   downloadJson(library, `adjung-translation-engine-backup.json`);
   $('backupMsg').textContent = '✓ Backup downloaded.';
