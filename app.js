@@ -506,6 +506,28 @@ function fieldBlock(label, text, cls, kind){
 let singleCardMode = false;
 let singleCardIndex = 0;
 
+// Final Review used to be read-only: catching a mistake there meant leaving the screen,
+// remembering which of three phases it came from, hunting the unit down again by search,
+// fixing it, and navigating all the way back. This state tracks an in-place edit on one of
+// a FINAL card's three writable fields (not the original source, which isn't editable),
+// independent of `mode`/`editingUnitId` since Final Review isn't a single-field batch phase.
+let editingFinalId = null;
+let editingFinalField = null; // 'parafrasa' | 'translation' | 'backTranslation'
+const FINAL_FIELD_META = {
+  parafrasa: { label: 'PARAPHRASE', cls: 'reference', kind: 'parafrasa' },
+  translation: { label: 'TRANSLATION', cls: '', kind: 'translation' },
+  backTranslation: { label: 'BACK TRANSLATION', cls: 'reference', kind: 'backtranslation' }
+};
+function finalFieldBlock(u, fieldKey){
+  const meta = FINAL_FIELD_META[fieldKey];
+  const text = u[fieldKey].text;
+  if(editingFinalId === u.id && editingFinalField === fieldKey){
+    return `<div class="unit-field kind-${meta.kind}"><small>${meta.label} (editing)</small><textarea class="edit-textarea" id="editFinalTextarea" dir="auto">${escapeHtml(text)}</textarea></div>
+      <div class="unit-actions"><button class="text-button" data-cancelfinaledit="1">Cancel</button><button class="approve-button" data-savefinaledit="${escapeHtml(u.id)}|${fieldKey}">✓ Save</button></div>`;
+  }
+  return `<div class="final-field-wrap">${fieldBlock(meta.label, text, meta.cls, meta.kind)}<button class="text-button edit-button final-edit-btn" data-editfinal="${escapeHtml(u.id)}|${fieldKey}">✎ Edit</button></div>`;
+}
+
 function renderUnitList(){
   const list = $('unitList');
   const allUnits = filteredUnits();
@@ -532,9 +554,9 @@ function renderUnitList(){
       html += `<div class="unit-card">
         <div class="unit-card-head"><b>${escapeHtml(u.id)}</b>${u.final ? '<span class="unit-status approved">FINAL</span>' : '<span class="unit-status pending">Not final</span>'}</div>
         ${fieldBlock('ORIGINAL', u.source, '', 'original')}
-        ${fieldBlock('PARAPHRASE', u.parafrasa.text, 'reference', 'parafrasa')}
-        ${fieldBlock('TRANSLATION', u.translation.text, '', 'translation')}
-        ${fieldBlock('BACK TRANSLATION', u.backTranslation.text, 'reference', 'backtranslation')}
+        ${finalFieldBlock(u, 'parafrasa')}
+        ${finalFieldBlock(u, 'translation')}
+        ${finalFieldBlock(u, 'backTranslation')}
         <div class="unit-actions">${u.final
           ? `<button class="reject-button" data-unfinal="${escapeHtml(u.id)}">Unmark FINAL</button>`
           : `<button class="approve-button" data-final="${escapeHtml(u.id)}">✓ Mark FINAL</button>`}</div>
@@ -796,6 +818,7 @@ $('unitList').addEventListener('click', e => {
   const t = sel => e.target.closest(`button[data-${sel}]`);
   const editBtn = t('edit'), saveEditBtn = t('saveedit'), cancelEditBtn = t('canceledit');
   const approveBtn = t('approve'), rejectBtn = t('reject'), finalBtn = t('final'), unfinalBtn = t('unfinal');
+  const editFinalBtn = t('editfinal'), saveFinalEditBtn = t('savefinaledit'), cancelFinalEditBtn = t('cancelfinaledit');
 
   if(editBtn){ editingUnitId = editBtn.dataset.edit; renderUnitList(); return; }
   if(cancelEditBtn){ editingUnitId = null; renderUnitList(); return; }
@@ -804,6 +827,21 @@ $('unitList').addEventListener('click', e => {
     const newText = $('editTextarea').value.trim();
     if(u && newText) workField(u).text = newText;
     editingUnitId = null;
+    save(); renderUnitList();
+    return;
+  }
+  if(editFinalBtn){
+    const [id, field] = editFinalBtn.dataset.editfinal.split('|');
+    editingFinalId = id; editingFinalField = field;
+    renderUnitList(); return;
+  }
+  if(cancelFinalEditBtn){ editingFinalId = null; editingFinalField = null; renderUnitList(); return; }
+  if(saveFinalEditBtn){
+    const [id, field] = saveFinalEditBtn.dataset.savefinaledit.split('|');
+    const u = doc.units.find(x => x.id === id);
+    const newText = $('editFinalTextarea').value.trim();
+    if(u && newText) u[field].text = newText;
+    editingFinalId = null; editingFinalField = null;
     save(); renderUnitList();
     return;
   }
