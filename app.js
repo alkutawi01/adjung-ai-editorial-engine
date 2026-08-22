@@ -474,9 +474,20 @@ function emptyStateMessage(){
   return 'No units match the current filters.';
 }
 
+// A single <p dir="auto"> around a whole multi-paragraph unit takes its direction from the FIRST
+// strong character in the entire block. A unit that opens with Arabic (e.g. a Bismillah line)
+// then flips its own Malay/English paragraphs to RTL too, even though only that first line is
+// Arabic — reported live as English text rendering right-aligned. Splitting on blank lines gives
+// each paragraph its own dir="auto", so direction is judged per-paragraph, not per-unit.
+function bidiSafeParagraphs(text){
+  return text.split(/\n{2,}/).map(para =>
+    `<p dir="auto">${escapeHtml(para).replace(/\n/g, '<br>')}</p>`
+  ).join('');
+}
+
 function fieldBlock(label, text, cls){
   if(!text) return '';
-  return `<div class="unit-field ${cls || ''}"><small>${escapeHtml(label)}</small><p dir="auto">${escapeHtml(text)}</p></div>`;
+  return `<div class="unit-field ${cls || ''}"><small>${escapeHtml(label)}</small>${bidiSafeParagraphs(text)}</div>`;
 }
 
 let singleCardMode = false;
