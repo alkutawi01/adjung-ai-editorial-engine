@@ -66,8 +66,8 @@
 
 *{box-sizing:border-box}
 [hidden]{display:none !important}
-html{scroll-behavior:smooth}
-body{margin:0;background:var(--paper);color:var(--ink);font:13px/1.5 var(--font-sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+html{scroll-behavior:smooth;height:100%}
+body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var(--ink);font:13px/1.5 var(--font-sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 h1,h2,h3{font-family:var(--font-serif);font-weight:400}
 
 /* Focus-visible is applied to every interactive element by default, then components opt out
@@ -77,7 +77,13 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   outline:2px solid var(--maroon); outline-offset:2px; border-radius:var(--r-sm);
 }
 
-.shell{min-height:100vh;display:flex;flex-direction:column}
+/* height, not min-height: the shell must be CLIPPED to the viewport so the sidebar and
+   the unit panel each become their own independent scroll region (via overflow-y:auto
+   further down). With min-height, the whole document just kept growing past the
+   viewport instead, so "the sidebar scrolls" was never actually true — the entire page
+   scrolled together, which is why a tall unit list dragged the sidebar's scroll
+   position along with it and buried Copy Prompt far below the fold. */
+.shell{height:100vh;display:flex;flex-direction:column}
 
 /* ---- Topbar --------------------------------------------------------------- */
 .topbar{height:60px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;background:var(--maroon);color:#fff;box-shadow:var(--shadow-sm);position:relative;z-index:5}
@@ -143,7 +149,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .workspace{flex:1;display:grid;grid-template-columns:360px 1fr;min-height:0}
 .sidebar{background:#fff;border-right:1px solid var(--line);padding:var(--sp-5);display:flex;flex-direction:column;gap:var(--sp-5);overflow-y:auto}
 .sidebar-section h2{margin:0 0 10px;font:600 12px var(--font-sans);letter-spacing:.03em;text-transform:uppercase;color:var(--maroon)}
-.sidebar-section.grow{flex:1;display:flex;flex-direction:column;min-height:0}
+/* NOT flex:1 — the sidebar is a scrolling flex column, so a flex:1 child here would
+   claim all leftover space in that column and balloon to hundreds of empty pixels
+   whenever the OTHER sections happen to be short, shoving Copy Prompt (and Step C
+   below it) far down the page. The prompt box gets its own bounded height instead. */
+.sidebar-section.grow{display:flex;flex-direction:column}
 .sidebar-section+.sidebar-section{padding-top:var(--sp-4);border-top:1px solid var(--line)}
 
 .book-card{border:1px solid var(--line);border-radius:var(--r-md);padding:var(--sp-4);background:var(--paper);box-shadow:var(--shadow-xs)}
@@ -159,7 +169,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .select-row{display:flex;gap:12px;margin-bottom:6px}
 .selected-count{margin:0;color:var(--muted);font-size:11px}
 .batch-warning{margin:4px 0 0;color:var(--warn);font-size:11px;min-height:14px}
-.prompt-out{flex:1;min-height:140px;width:100%;padding:10px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--paper);color:#44403c;font:11px/1.5 var(--font-mono);resize:vertical;transition:border-color var(--dur-fast) var(--ease)}
+.prompt-out{min-height:160px;max-height:280px;width:100%;padding:10px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--paper);color:#44403c;font:11px/1.5 var(--font-mono);resize:vertical;transition:border-color var(--dur-fast) var(--ease)}
 .paste-in{width:100%;height:120px;padding:10px;border:1.5px dashed var(--line-strong);border-radius:var(--r-md);color:#44403c;font:11px/1.5 var(--font-mono);resize:vertical;margin-bottom:8px;background:#fff;transition:border-color var(--dur-fast) var(--ease)}
 .paste-in:focus{border-color:var(--maroon);border-style:solid;outline:none;box-shadow:var(--focus-ring)}
 
