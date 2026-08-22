@@ -78,10 +78,21 @@ body{margin:0;background:var(--paper);color:var(--ink);font:13px var(--font-sans
 .unit-status.pending{background:#fff1d9;color:var(--warn)}
 .unit-status.approved{background:#e7f0e9;color:var(--success)}
 .unit-status.rejected{background:#fbe9e7;color:var(--error)}
-.unit-field{margin-top:8px}
+.unit-field{margin-top:8px;padding-left:10px;border-left:3px solid transparent}
 .unit-field small{display:block;color:#78716c;font:600 9px var(--font-mono);letter-spacing:.06em;margin-bottom:3px}
-.unit-field p{margin:0;font:14px/1.6 var(--font-serif);color:#292524;white-space:pre-wrap}
+.unit-field p{margin:0 0 6px;font:14px/1.6 var(--font-serif);color:#292524;white-space:pre-wrap}
+.unit-field p:last-child{margin-bottom:0}
 .unit-field.note p{font:12px/1.55 var(--font-sans);color:var(--warn)}
+/* Each pipeline stage gets its own color so ORIGINAL / PARAPHRASE / TRANSLATION / BACK
+   TRANSLATION are distinguishable at a glance instead of reading as identical gray blocks. */
+.unit-field.kind-original{border-left-color:#a8a29e}
+.unit-field.kind-original small{color:#78716c}
+.unit-field.kind-parafrasa{border-left-color:#2d6e8e}
+.unit-field.kind-parafrasa small{color:#2d6e8e}
+.unit-field.kind-translation{border-left-color:var(--maroon)}
+.unit-field.kind-translation small{color:var(--maroon)}
+.unit-field.kind-backtranslation{border-left-color:#8a5a2d}
+.unit-field.kind-backtranslation small{color:#8a5a2d}
 .unit-actions{display:flex;gap:8px;margin-top:12px}
 .empty-state{padding:40px;text-align:center;color:#a8a29e;font-size:12px}
 .hint-small{color:var(--muted);font-size:11px;line-height:1.5;margin:0 0 8px}

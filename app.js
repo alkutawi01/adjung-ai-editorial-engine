@@ -485,9 +485,9 @@ function bidiSafeParagraphs(text){
   ).join('');
 }
 
-function fieldBlock(label, text, cls){
+function fieldBlock(label, text, cls, kind){
   if(!text) return '';
-  return `<div class="unit-field ${cls || ''}"><small>${escapeHtml(label)}</small>${bidiSafeParagraphs(text)}</div>`;
+  return `<div class="unit-field ${cls || ''} ${kind ? 'kind-' + kind : ''}"><small>${escapeHtml(label)}</small>${bidiSafeParagraphs(text)}</div>`;
 }
 
 let singleCardMode = false;
@@ -518,10 +518,10 @@ function renderUnitList(){
     if(phase === 'final'){
       html += `<div class="unit-card">
         <div class="unit-card-head"><b>${escapeHtml(u.id)}</b>${u.final ? '<span class="unit-status approved">FINAL</span>' : '<span class="unit-status pending">Not final</span>'}</div>
-        ${fieldBlock('ORIGINAL', u.source)}
-        ${fieldBlock('PARAPHRASE', u.parafrasa.text, 'reference')}
-        ${fieldBlock('TRANSLATION', u.translation.text)}
-        ${fieldBlock('BACK TRANSLATION', u.backTranslation.text, 'reference')}
+        ${fieldBlock('ORIGINAL', u.source, '', 'original')}
+        ${fieldBlock('PARAPHRASE', u.parafrasa.text, 'reference', 'parafrasa')}
+        ${fieldBlock('TRANSLATION', u.translation.text, '', 'translation')}
+        ${fieldBlock('BACK TRANSLATION', u.backTranslation.text, 'reference', 'backtranslation')}
         <div class="unit-actions">${u.final
           ? `<button class="reject-button" data-unfinal="${escapeHtml(u.id)}">Unmark FINAL</button>`
           : `<button class="approve-button" data-final="${escapeHtml(u.id)}">✓ Mark FINAL</button>`}</div>
@@ -544,12 +544,12 @@ function renderUnitList(){
         <span class="unit-status ${w.status}">${statusLabel(w.status)}</span>
         ${u.final ? '<span class="unit-status approved">FINAL</span>' : ''}
       </div>
-      ${fieldBlock('ORIGINAL TEXT', u.source)}
-      ${refLabel ? fieldBlock(refLabel, refText, 'reference') : ''}
+      ${fieldBlock('ORIGINAL TEXT', u.source, '', 'original')}
+      ${refLabel ? fieldBlock(refLabel, refText, 'reference', mode === 'translation' ? 'parafrasa' : 'translation') : ''}
       ${editingUnitId === u.id
-        ? `<div class="unit-field"><small>${label} (editing)</small><textarea class="edit-textarea" id="editTextarea" dir="auto">${escapeHtml(w.text)}</textarea></div>
+        ? `<div class="unit-field kind-${mode}"><small>${label} (editing)</small><textarea class="edit-textarea" id="editTextarea" dir="auto">${escapeHtml(w.text)}</textarea></div>
            <div class="unit-actions"><button class="text-button" data-canceledit="${escapeHtml(u.id)}">Cancel</button><button class="approve-button" data-saveedit="${escapeHtml(u.id)}">✓ Save</button></div>`
-        : `${fieldBlock(label, w.text)}
+        : `${fieldBlock(label, w.text, '', mode)}
            ${fieldBlock('CHATBOT NOTE', w.notes, 'note')}
            ${w.status === 'pending' ? `<div class="unit-actions"><button class="reject-button" data-reject="${escapeHtml(u.id)}">Reject</button><button class="text-button edit-button" data-edit="${escapeHtml(u.id)}">✎ Edit</button><button class="approve-button" data-approve="${escapeHtml(u.id)}">${approveLabel}</button></div>` : ''}
            ${w.status === 'approved' ? `<div class="unit-actions"><button class="reject-button" data-reject="${escapeHtml(u.id)}">Reopen for review</button><button class="text-button edit-button" data-edit="${escapeHtml(u.id)}">✎ Edit</button></div>` : ''}`
