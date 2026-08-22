@@ -479,10 +479,26 @@ function fieldBlock(label, text, cls){
   return `<div class="unit-field ${cls || ''}"><small>${escapeHtml(label)}</small><p dir="auto">${escapeHtml(text)}</p></div>`;
 }
 
+let singleCardMode = false;
+let singleCardIndex = 0;
+
 function renderUnitList(){
   const list = $('unitList');
-  const units = filteredUnits();
-  if(!units.length){ list.innerHTML = `<div class="empty-state">${escapeHtml(emptyStateMessage())}</div>`; return; }
+  const allUnits = filteredUnits();
+  if(!allUnits.length){
+    list.innerHTML = `<div class="empty-state">${escapeHtml(emptyStateMessage())}</div>`;
+    $('singleCardNav').hidden = true;
+    return;
+  }
+  if(singleCardIndex >= allUnits.length) singleCardIndex = allUnits.length - 1;
+  if(singleCardIndex < 0) singleCardIndex = 0;
+  const units = singleCardMode ? [allUnits[singleCardIndex]] : allUnits;
+  $('singleCardNav').hidden = !singleCardMode;
+  if(singleCardMode){
+    $('singleCardPos').textContent = `${singleCardIndex + 1} / ${allUnits.length} — ${allUnits[singleCardIndex].id}`;
+    $('singleCardPrev').disabled = singleCardIndex === 0;
+    $('singleCardNext').disabled = singleCardIndex === allUnits.length - 1;
+  }
   let lastChapter = null;
   let html = '';
   units.forEach(u => {
@@ -607,6 +623,8 @@ function renderPromptTranslation(sel){
   if(!lang) return null;
   const body = sel.map(u => `[UNIT: ${u.id}]\n[ORIGINAL_TEXT]\n${u.source}\n[APPROVED_PARAPHRASE]\n${u.parafrasa.text}`).join('\n\n');
   return `YOU ARE: A professional translator producing a faithful translation into ${lang}. Base your translation on BOTH the original text AND the approved paraphrase together: the paraphrase confirms meaning, the original is the authority for wording and tone. Preserve the author's first-person voice and intent. Do not soften, summarize, or add commentary.
+
+Translate every word into ${lang}, including ordinary source-language words (e.g. legal, cultural, or administrative terms in the source language that have a plain ${lang} equivalent). Do NOT leave the source-language word in parentheses after its ${lang} translation (e.g. do not write "Islamic law (syariat)" or "doubts (kemusykilan)") — just give the ${lang} translation on its own. The ONLY exception is a genuine technical term from a third language (e.g. classical Arabic scholarly or legal terminology) that has no adequate ${lang} equivalent — those may be kept in their original script/transliteration, parenthetically glossed if helpful.
 ${bookProfileBlockFor()}${memoryBlockFor(sel.map(u => u.source + '\n' + u.parafrasa.text).join('\n'))}
 For EACH unit below, return a translation into ${lang} and a short note flagging anything ambiguous, uncertain, or needing human attention (leave NOTES empty if there is nothing to flag).
 
@@ -705,9 +723,12 @@ function renderAll(){
 }
 
 // ---- Selection & filters -----------------------------------------------------
-$('unitSearch').oninput = renderUnitList;
-$('statusFilter').onchange = renderUnitList;
-$('chapterFilter').onchange = renderUnitList;
+$('unitSearch').oninput = () => { singleCardIndex = 0; renderUnitList(); };
+$('statusFilter').onchange = () => { singleCardIndex = 0; renderUnitList(); };
+$('chapterFilter').onchange = () => { singleCardIndex = 0; renderUnitList(); };
+$('singleCardToggle').onchange = () => { singleCardMode = $('singleCardToggle').checked; singleCardIndex = 0; renderUnitList(); };
+$('singleCardPrev').onclick = () => { singleCardIndex--; renderUnitList(); };
+$('singleCardNext').onclick = () => { singleCardIndex++; renderUnitList(); };
 $('targetLangInput').oninput = () => { if(doc){ doc.targetLang = $('targetLangInput').value; save(); renderPrompt(); } };
 $('sourceLangInput').oninput = () => { if(doc){ doc.sourceLang = $('sourceLangInput').value; save(); renderPrompt(); } };
 // Fills up to the cap and stops rather than overshooting — the remaining filtered units are left

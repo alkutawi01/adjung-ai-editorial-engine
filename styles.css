@@ -62,8 +62,11 @@ body{margin:0;background:var(--paper);color:var(--ink);font:13px var(--font-sans
 .unit-panel{display:flex;flex-direction:column;min-height:0;padding:20px 28px;overflow-y:auto}
 .unit-panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .unit-panel-head h2{margin:0;font:400 20px var(--font-serif)}
-.filter-row{display:flex;gap:8px}
+.filter-row{display:flex;align-items:center;gap:8px}
 .filter-row select{padding:8px 10px;border:1px solid #d6d3d1;border-radius:5px;font:12px var(--font-sans)}
+.single-card-toggle{display:flex;align-items:center;gap:5px;font:12px var(--font-sans);color:var(--muted);white-space:nowrap;cursor:pointer}
+.single-card-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px;padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--paper);font:12px var(--font-sans)}
+.single-card-nav button:disabled{opacity:.4;cursor:default}
 .unit-list{display:flex;flex-direction:column;gap:14px}
 .chapter-heading{margin:10px 0 2px;font:600 11px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--maroon);border-bottom:1px solid var(--line);padding-bottom:6px}
 .unit-card{border:1px solid var(--line);border-radius:8px;padding:14px 16px;background:#fff}

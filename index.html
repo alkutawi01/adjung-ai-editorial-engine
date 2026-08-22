@@ -135,11 +135,17 @@
           <div class="filter-row" id="filterRow">
             <select id="statusFilter"></select>
             <select id="chapterFilter"><option value="">All sections</option></select>
+            <label class="single-card-toggle"><input type="checkbox" id="singleCardToggle"> One at a time</label>
           </div>
         </div>
         <div id="bookProfilePanel" hidden>
           <div id="bookProfileFields" class="bp-fields"></div>
           <div class="unit-actions" id="bookProfileActions"></div>
+        </div>
+        <div id="singleCardNav" class="single-card-nav" hidden>
+          <button class="text-button" id="singleCardPrev">← Previous</button>
+          <span id="singleCardPos"></span>
+          <button class="text-button" id="singleCardNext">Next →</button>
         </div>
         <div id="unitList" class="unit-list"></div>
       </section>
