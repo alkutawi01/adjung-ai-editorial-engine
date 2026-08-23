@@ -114,7 +114,7 @@
             <input type="text" id="targetLangInput" placeholder="e.g. English, Arabic…">
           </div>
           <details class="sidebar-section step-section" id="decisionMemorySection">
-            <summary><h2>Decision Memory <span id="dmCount" class="unit-status none">0</span></h2><p id="dmSummaryLine" class="hint-small dm-summary-line"></p></summary>
+            <summary><span class="chevron" aria-hidden="true">▸</span><h2>Decision Memory <span id="dmCount" class="unit-status none">0</span></h2><p id="dmSummaryLine" class="hint-small dm-summary-line"></p></summary>
             <p class="hint-small">Approved rulings on terms and style — names, religious terms, transliteration, house style. Only entries whose term appears in the selected units are added to the prompt.</p>
             <div class="dm-add-row">
               <input type="text" id="dmTermInput" placeholder="Term (e.g. tawaqquf)">
@@ -123,7 +123,7 @@
             </div>
             <div id="dmList" class="dm-list"></div>
             <details class="step-section dm-suggest-section" id="dmSuggestSection">
-              <summary><h2>Suggest rulings via chatbot</h2></summary>
+              <summary><span class="chevron" aria-hidden="true">▸</span><h2>Suggest rulings via chatbot</h2></summary>
               <p class="hint-small">For terms with no ruling yet, ask a chatbot to propose one from the Book Profile context — you still Accept or Reject each suggestion.</p>
               <textarea id="dmSuggestPromptOut" class="prompt-out dm-suggest-prompt" readonly></textarea>
               <button class="copy-button" id="dmCopySuggestBtn">▣ Copy prompt</button>
@@ -142,7 +142,7 @@
                repeated dozens of times per manuscript) doesn't ask the editor to re-parse all
                three steps' worth of controls on every single pass. -->
           <details class="sidebar-section step-section batch-step" id="stepA">
-            <summary><h2>Step A · Pick units</h2><p id="stepASummary" class="hint-small step-summary-line"></p></summary>
+            <summary><span class="chevron" aria-hidden="true">▸</span><h2>Step A · Pick units</h2><p id="stepASummary" class="hint-small step-summary-line"></p></summary>
             <input type="search" id="unitSearch" placeholder="Search text or unit ID…">
             <div class="select-row">
               <button class="text-button" id="selectAllBtn">Select all filtered</button>
@@ -154,13 +154,13 @@
             <p id="batchWarning" class="batch-warning" role="status"></p>
           </details>
           <details class="sidebar-section step-section batch-step" id="stepB">
-            <summary><h2>Step B · Copy prompt</h2><p id="stepBSummary" class="hint-small step-summary-line"></p></summary>
+            <summary><span class="chevron" aria-hidden="true">▸</span><h2>Step B · Copy prompt</h2><p id="stepBSummary" class="hint-small step-summary-line"></p></summary>
             <p id="promptSummary" class="prompt-summary" hidden></p>
             <textarea id="promptOut" class="prompt-out" readonly placeholder="Pick units on the right to build a prompt…"></textarea>
             <button class="copy-button" id="copyPromptBtn">▣ Copy prompt</button>
           </details>
           <details class="sidebar-section step-section batch-step" id="stepC">
-            <summary><h2>Step C · Paste the reply</h2><p id="stepCSummary" class="hint-small step-summary-line"></p></summary>
+            <summary><span class="chevron" aria-hidden="true">▸</span><h2>Step C · Paste the reply</h2><p id="stepCSummary" class="hint-small step-summary-line"></p></summary>
             <p class="hint-small">Status goes Sent → Awaiting review → Approved as you copy, then paste, then approve. If a copy failed or was never actually sent, a "Clear sent status" option appears above (next to the unit list) once anything is marked Sent — use it to unstick that unit and pick it again.</p>
             <textarea id="pasteIn" class="paste-in" placeholder="Paste the chatbot's full reply here…"></textarea>
             <p id="pasteInStatus" class="hint-small paste-status"></p>

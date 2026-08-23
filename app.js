@@ -542,6 +542,27 @@ const PHASES = {
 };
 const BATCH_PHASES = ['parafrasa', 'translation', 'backtranslation'];
 
+// FINAL means Paraphrase, Translation AND Back Translation are all correct together — editing,
+// rejecting, or reopening any earlier stage doesn't just invalidate that stage, it invalidates
+// everything built on top of it. Marking a downstream stage 'stale' (rather than silently leaving
+// it 'approved') is what stops a since-changed Paraphrase from quietly exporting a Back
+// Translation that was actually checked against an earlier, different Translation.
+const STAGE_ORDER = ['parafrasa', 'translation', 'backTranslation'];
+const STAGE_LABEL = { parafrasa: 'Paraphrase', translation: 'Translation', backTranslation: 'Back Translation' };
+function invalidateDownstream(u, fromField){
+  const idx = STAGE_ORDER.indexOf(fromField);
+  const invalidated = [];
+  for(let i = idx + 1; i < STAGE_ORDER.length; i++){
+    const f = STAGE_ORDER[i];
+    if(['approved', 'pending', 'sent'].includes(u[f].status)){
+      u[f].status = 'stale';
+      invalidated.push(STAGE_LABEL[f]);
+    }
+  }
+  if(u.final){ u.final = false; invalidated.push('FINAL'); }
+  return invalidated;
+}
+
 function anyApproved(field){ return (doc?.units || []).some(u => u[field].status === 'approved'); }
 function bookProfileReady(){ return doc?.bookProfile?.status === 'approved'; }
 
@@ -623,19 +644,21 @@ function renderPhaseNav(){
   });
   const count = f => (doc?.units || []).filter(u => u[f].status === 'approved').length;
   const pend = f => (doc?.units || []).filter(u => u[f].status === 'pending').length;
+  const stale = f => (doc?.units || []).filter(u => u[f].status === 'stale').length;
   // A locked badge stays a short fixed "Locked" — the full unlock reason lives in one place
   // (the "Next" line below the nav, or the inline explanation on click), not repeated three
-  // times in slightly different wording across three crowded tab badges.
-  const badge = (el, name, approved, pending) => {
+  // times in slightly different wording across three crowded tab badges. "done" on its own would
+  // be a lie the moment an earlier stage invalidates this one, so stale takes priority over it.
+  const badge = (el, name, approved, pending, staleCount) => {
     const locked = phaseLocked(name);
-    $(el).textContent = locked ? '🔒 Locked' : pending ? `${pending} to review` : approved ? `${approved} done` : '';
-    $(el).className = 'phase-badge' + (locked ? ' locked' : pending ? ' pending' : approved ? ' done' : '');
+    $(el).textContent = locked ? '🔒 Locked' : staleCount ? `${staleCount} stale — rerun` : pending ? `${pending} to review` : approved ? `${approved} done` : '';
+    $(el).className = 'phase-badge' + (locked ? ' locked' : staleCount ? ' stale' : pending ? ' pending' : approved ? ' done' : '');
   };
   $('badgeScan').textContent = doc?.bookProfile?.status === 'approved' ? 'done' : doc?.bookProfile?.status === 'pending' ? 'to review' : '';
   $('badgeScan').className = 'phase-badge' + (doc?.bookProfile?.status === 'approved' ? ' done' : doc?.bookProfile?.status === 'pending' ? ' pending' : '');
-  badge('badgeParaphrase', 'parafrasa', count('parafrasa'), pend('parafrasa'));
-  badge('badgeTranslation', 'translation', count('translation'), pend('translation'));
-  badge('badgeBack', 'backtranslation', count('backTranslation'), pend('backTranslation'));
+  badge('badgeParaphrase', 'parafrasa', count('parafrasa'), pend('parafrasa'), stale('parafrasa'));
+  badge('badgeTranslation', 'translation', count('translation'), pend('translation'), stale('translation'));
+  badge('badgeBack', 'backtranslation', count('backTranslation'), pend('backTranslation'), stale('backTranslation'));
   const finalCount = (doc?.units || []).filter(u => u.final).length;
   badge('badgeFinal', 'final', finalCount, 0);
   if(!phaseLocked('final')){
@@ -687,7 +710,7 @@ function renderStatusFilterOptions(){
   const sel = $('statusFilter');
   const current = sel.value;
   const noneLabel = { parafrasa: 'No paraphrase yet', translation: 'No translation yet', backtranslation: 'No back translation yet' }[mode];
-  const options = [['', 'All statuses'], ['none', noneLabel], ['sent', 'Sent — awaiting reply'], ['pending', 'Awaiting review'], ['approved', 'Approved'], ['rejected', 'Rejected']];
+  const options = [['', 'All statuses'], ['none', noneLabel], ['sent', 'Sent — awaiting reply'], ['pending', 'Awaiting review'], ['approved', 'Approved'], ['stale', 'Stale — rerun needed'], ['rejected', 'Rejected']];
   sel.innerHTML = options.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
   if(options.some(([v]) => v === current)) sel.value = current;
 }
@@ -702,17 +725,21 @@ function renderDocSummary(){
     const approved = doc.units.filter(u => u[f].status === 'approved').length;
     const pending = doc.units.filter(u => u[f].status === 'pending').length;
     const sent = doc.units.filter(u => u[f].status === 'sent').length;
-    const notStarted = total - approved - pending - sent;
-    return { approved, pending, sent, notStarted };
+    const stale = doc.units.filter(u => u[f].status === 'stale').length;
+    const notStarted = total - approved - pending - sent - stale;
+    return { approved, pending, sent, stale, notStarted };
   };
+  // "Approved" alone during a re-run doesn't say the approval is against text that no longer
+  // exists — surfacing "stale" here is what stops a chain that looks finished from actually
+  // being finished.
   const statLine = s => `${s.approved} approved · ${s.notStarted} not started`
-    + (s.sent ? ` · ${s.sent} sent` : '') + (s.pending ? ` · ${s.pending} awaiting review` : '');
+    + (s.sent ? ` · ${s.sent} sent` : '') + (s.pending ? ` · ${s.pending} awaiting review` : '') + (s.stale ? ` · ${s.stale} stale` : '');
   const p = stat('parafrasa'), t = stat('translation'), b = stat('backTranslation');
   const finalCount = doc.units.filter(u => u.final).length;
   const rows = [`<div class="stat-label">Units</div><div class="stat-value">${total} · ${currentChapters().length} sections</div>`];
   rows.push(`<div class="stat-label">Paraphrase</div><div class="stat-value">${statLine(p)}</div>`);
-  if(p.approved || t.approved || t.pending || t.sent) rows.push(`<div class="stat-label">Translation</div><div class="stat-value">${statLine(t)}</div>`);
-  if(t.approved || b.approved || b.pending || b.sent) rows.push(`<div class="stat-label">Back Translation</div><div class="stat-value">${statLine(b)}</div>`);
+  if(p.approved || t.approved || t.pending || t.sent || t.stale) rows.push(`<div class="stat-label">Translation</div><div class="stat-value">${statLine(t)}</div>`);
+  if(t.approved || b.approved || b.pending || b.sent || b.stale) rows.push(`<div class="stat-label">Back Translation</div><div class="stat-value">${statLine(b)}</div>`);
   $('docSummary').innerHTML = `<div class="book-card">
     <p class="book-card-title" dir="auto">${escapeHtml(doc.fileName)}</p>
     <div class="book-stats">${rows.join('')}<div class="stat-final"><span>FINAL units</span><span>${finalCount} / ${total}</span></div></div>
@@ -818,7 +845,7 @@ function renderUnitList(){
 
     const w = workField(u);
     const cfg = PHASES[mode];
-    const isSelectable = w.status === 'none' || w.status === 'rejected';
+    const isSelectable = w.status === 'none' || w.status === 'rejected' || w.status === 'stale';
     const label = { parafrasa: 'PARAPHRASE', translation: 'TRANSLATION', backtranslation: 'BACK TRANSLATION' }[mode];
     const approveLabel = { parafrasa: '✓ Approve paraphrase', translation: '✓ Approve translation', backtranslation: '✓ Approve back translation' }[mode];
     const refLabel = { translation: 'APPROVED PARAPHRASE', backtranslation: 'APPROVED TRANSLATION' }[mode];
@@ -833,6 +860,7 @@ function renderUnitList(){
       </div>
       ${fieldBlock('ORIGINAL TEXT', u.source, '', 'original')}
       ${refLabel ? fieldBlock(refLabel, refText, 'reference', mode === 'translation' ? 'parafrasa' : 'translation') : ''}
+      ${w.status === 'stale' ? `<p class="stale-banner">⚠ ${statusLabel('stale')} — the text below is outdated. Pick this unit above to send it again.</p>` : ''}
       ${editingUnitId === u.id
         ? `<div class="unit-field kind-${mode}"><small>${label} (editing)</small><textarea class="edit-textarea" id="editTextarea" dir="auto">${escapeHtml(w.text)}</textarea></div>
            <div class="unit-actions"><button class="text-button" data-canceledit="${escapeHtml(u.id)}">Cancel</button><button class="approve-button" data-saveedit="${escapeHtml(u.id)}">✓ Save</button></div>`
@@ -849,7 +877,8 @@ function renderUnitList(){
 
 function statusLabel(s){
   const noneLabel = { parafrasa: 'No paraphrase yet', translation: 'No translation yet', backtranslation: 'No back translation yet' }[mode];
-  return { none: noneLabel, sent: 'Sent — awaiting reply', pending: 'Awaiting review', approved: 'Approved', rejected: 'Rejected' }[s] || s;
+  const staleLabel = { parafrasa: 'Stale — earlier text changed, rerun needed', translation: 'Stale — earlier text changed, rerun needed', backtranslation: 'Stale — Translation changed, rerun needed' }[mode];
+  return { none: noneLabel, sent: 'Sent — awaiting reply', pending: 'Awaiting review', approved: 'Approved', rejected: 'Rejected', stale: staleLabel }[s] || s;
 }
 
 // A prompt can be copied and handed to a chatbot without the app ever knowing whether that
@@ -1085,7 +1114,7 @@ function renderAll(){
     // mirror-back isn't the place to apply terminology rulings. Without saying so, the missing
     // panels read as something broken rather than something deliberate.
     $('backtranslationInfo').hidden = mode !== 'backtranslation';
-    if(mode === 'backtranslation') $('backtranslationInfo').textContent = `Back-translating to: ${doc.sourceLang || '(source language not set)'} — Decision Memory is intentionally not used here; it mirrors the translation literally.`;
+    if(mode === 'backtranslation') $('backtranslationInfo').innerHTML = `Back-translating into: <b>${escapeHtml(doc.sourceLang || '(source language not set)')}</b><br>Literal comparison mode — Decision Memory is intentionally not applied.`;
     $('sourceLangInput').value = doc.sourceLang || '';
     $('targetLangInput').value = doc.targetLang || '';
     $('targetLangInputScan').value = doc.targetLang || '';
@@ -1239,10 +1268,10 @@ $('unitList').addEventListener('click', e => {
     const newText = $('editTextarea').value.trim();
     const changed = u && newText && newText !== workField(u).text;
     if(u && newText) workField(u).text = newText;
-    // Same rule as Final Review's inline edit: changing an already-approved Paraphrase or
-    // Translation text here is possible (Edit stays available after approval), and a unit
-    // marked FINAL depends on all three stages being correct — not just the one being edited.
-    if(changed && u.final) u.final = false;
+    // Changing an already-approved Paraphrase or Translation text here is possible (Edit stays
+    // available after approval) — cascade the same way a Reject would, since the text a later
+    // stage was built on just changed under it.
+    if(changed) invalidateDownstream(u, PHASES[mode].field);
     editingUnitId = null;
     save(); renderUnitList();
     return;
@@ -1263,10 +1292,15 @@ $('unitList').addEventListener('click', e => {
     // any actual text change means the unit goes back to "not final" until reconfirmed.
     const changed = u && newText && newText !== u[field].text;
     if(u && newText) u[field].text = newText;
-    if(changed && u.final){
-      u.final = false;
-      $('finalEditNotice').textContent = `${id} edited — automatically unmarked FINAL. Review and Mark FINAL again when ready.`;
-      setTimeout(() => { $('finalEditNotice').textContent = ''; }, 6000);
+    if(changed){
+      const invalidated = invalidateDownstream(u, field);
+      const stagesOnly = invalidated.filter(x => x !== 'FINAL');
+      if(invalidated.length){
+        $('finalEditNotice').textContent = stagesOnly.length
+          ? `${id} edited — ${stagesOnly.join(' and ')} now stale and FINAL unmarked. This unit leaves Final Review until the stale stage(s) are rerun and reapproved.`
+          : `${id} edited — automatically unmarked FINAL. Review and Mark FINAL again when ready.`;
+        setTimeout(() => { $('finalEditNotice').textContent = ''; }, 8000);
+      }
     }
     editingFinalId = null; editingFinalField = null;
     save(); renderUnitList();
@@ -1279,12 +1313,13 @@ $('unitList').addEventListener('click', e => {
   }
   if(rejectBtn){
     const u = doc.units.find(x => x.id === rejectBtn.dataset.reject);
-    // FINAL depends on Paraphrase, Translation, AND Back Translation all being correct — a real
-    // gap Codex caught: rejecting or reopening any ONE of the three (this button doubles as both
-    // "Reject" on a pending unit and "Reopen for review" on an approved one) left FINAL standing
-    // even though the stage it depends on had just been pulled out from under it. Not just a
-    // Back Translation special case — every stage unmarks FINAL the same way.
-    if(u){ workField(u).status = 'rejected'; u.final = false; }
+    // FINAL depends on Paraphrase, Translation, AND Back Translation all being correct together —
+    // rejecting or reopening any ONE of the three (this button doubles as "Reject" on a pending
+    // unit and "Reopen for review" on an approved one) has to cascade to every stage built on top
+    // of it, not just clear FINAL. A Translation reopened after Back Translation already ran
+    // against the old text leaves that Back Translation checking against text that no longer
+    // exists — it needs to be marked stale, not left reading "Approved".
+    if(u){ workField(u).status = 'rejected'; invalidateDownstream(u, PHASES[mode].field); }
     save(); renderAll();
   }
   if(finalBtn){
