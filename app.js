@@ -416,11 +416,21 @@ function renderDecisionMemory(){
     : empty ? `${ruled.length} ruling(s) saved (${names}) · ${empty} term(s) still need one` : `${ruled.length} ruling(s) saved: ${names}`;
   const list = $('dmList');
   if(!doc.decisionMemory.length){ list.innerHTML = '<p class="dm-empty">No rulings saved yet.</p>'; return; }
-  list.innerHTML = doc.decisionMemory.map(e => {
+  const q = foldDiacritics(($('dmSearch')?.value || '').trim()).toLowerCase();
+  const catF = $('dmCategoryFilter')?.value || '';
+  const visible = doc.decisionMemory.filter(e =>
+    (!catF || (e.category || '') === catF) &&
+    (!q || foldDiacritics(e.term).toLowerCase().includes(q) || foldDiacritics(e.decision || '').toLowerCase().includes(q))
+  );
+  if(!visible.length){ list.innerHTML = '<p class="dm-empty">No rulings match this search/filter.</p>'; return; }
+  const CATS = ['Character', 'Place', 'Religious/Cultural', 'Style', 'Transliteration', 'Other'];
+  const catOptions = CATS.map(c => `<option value="${c}">${c}</option>`).join('');
+  list.innerHTML = visible.map(e => {
     if(editingDmId === e.id){
       return `<div class="dm-entry">
         <div class="dm-entry-head"><span class="dm-entry-term" dir="auto">${escapeHtml(e.term)}</span></div>
         <textarea class="dm-decision-input" id="dmEditDecision" rows="2" placeholder="Ruling for this term…">${escapeHtml(e.decision)}</textarea>
+        <select id="dmEditCategory"><option value="">Category (optional)</option>${catOptions}</select>
         <div class="unit-actions"><button class="text-button" data-dmcanceledit="1">Cancel</button><button class="approve-button" data-dmsaveedit="${escapeHtml(e.id)}">✓ Save</button></div>
       </div>`;
     }
@@ -432,11 +442,15 @@ function renderDecisionMemory(){
         <div class="unit-actions"><button class="reject-button" data-dmrejectsuggest="${escapeHtml(e.id)}">Reject</button><button class="approve-button" data-dmacceptsuggest="${escapeHtml(e.id)}">✓ Accept</button></div>
       </div>` : '';
     return `<div class="dm-entry">
-      <div class="dm-entry-head"><span class="dm-entry-term" dir="auto">${escapeHtml(e.term)}</span><span class="dm-entry-actions"><button class="dm-remove" data-dmedit="${escapeHtml(e.id)}">Edit</button><button class="dm-remove" data-dmremove="${escapeHtml(e.id)}">Remove</button></span></div>
+      <div class="dm-entry-head"><span class="dm-entry-term" dir="auto">${escapeHtml(e.term)}${e.category ? `<span class="dm-category-tag">${escapeHtml(e.category)}</span>` : ''}</span><span class="dm-entry-actions"><button class="dm-remove" data-dmedit="${escapeHtml(e.id)}">Edit</button><button class="dm-remove" data-dmremove="${escapeHtml(e.id)}">Remove</button></span></div>
       <p class="dm-entry-decision${empty ? ' dm-entry-empty' : ''}" dir="auto">${e.decision ? escapeHtml(e.decision) : 'No ruling yet — click Edit to add one. Until then this term is not sent to the chatbot.'}</p>
       ${suggestionHtml}
     </div>`;
   }).join('');
+  if(editingDmId){
+    const editing = doc.decisionMemory.find(x => x.id === editingDmId);
+    if(editing && $('dmEditCategory')) $('dmEditCategory').value = editing.category || '';
+  }
   renderDmSuggestPrompt();
 }
 
@@ -508,14 +522,104 @@ $('dmList').addEventListener('click', e => {
 $('dmAddBtn').onclick = () => {
   const term = $('dmTermInput').value.trim();
   const decision = $('dmDecisionInput').value.trim();
+  const category = $('dmCategoryInput').value;
   if(!term || !decision) return;
   if(doc.decisionMemory.some(e => e.term.toLowerCase() === term.toLowerCase())){
     $('dmTermInput').value = ''; $('dmDecisionInput').value = '';
     return; // a term may only carry one approved ruling
   }
-  doc.decisionMemory.push({ id: `DM${Date.now().toString(36)}`, term, decision });
-  $('dmTermInput').value = ''; $('dmDecisionInput').value = '';
+  doc.decisionMemory.push({ id: `DM${Date.now().toString(36)}`, term, decision, category });
+  $('dmTermInput').value = ''; $('dmDecisionInput').value = ''; $('dmCategoryInput').value = '';
   save(); renderDecisionMemory(); renderPrompt();
+};
+$('dmSearch').addEventListener('input', () => renderDecisionMemory());
+$('dmCategoryFilter').addEventListener('change', () => renderDecisionMemory());
+
+// Decision Memory needs to travel on its own, not just bundled inside a full Translation Guide —
+// an editor building up a house-style glossary across many unrelated projects (not a book series
+// sharing one Guide) still wants to carry terminology forward. CSV is included alongside JSON
+// because a term/ruling/category table is exactly the shape a spreadsheet already understands,
+// and this app's own local-first, no-lock-in stance means "can this leave as something Excel can
+// open" matters as much as "can it leave at all".
+function csvEscape(v){
+  const s = String(v ?? '');
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function decisionMemoryToCsv(entries){
+  const rows = entries.map(e => [e.term, e.decision, e.category || ''].map(csvEscape).join(','));
+  return ['term,decision,category', ...rows].join('\n');
+}
+function parseCsv(text){
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for(let i = 0; i < text.length; i++){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){ if(text[i + 1] === '"'){ field += '"'; i++; } else inQuotes = false; }
+      else field += c;
+    } else if(c === '"'){ inQuotes = true; }
+    else if(c === ','){ row.push(field); field = ''; }
+    else if(c === '\n' || c === '\r'){
+      if(c === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); rows.push(row); row = []; field = '';
+    } else field += c;
+  }
+  if(field.length || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim() !== ''));
+}
+function downloadText(text, filename, mime){
+  const blob = new Blob([text], { type: mime || 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+$('dmExportJsonBtn').onclick = () => {
+  const entries = doc.decisionMemory.filter(e => e.decision);
+  if(!entries.length){ $('dmIoMsg').textContent = 'No approved rulings to export yet.'; return; }
+  downloadJson({ kind: 'adjung-decision-memory', exportedAt: new Date().toISOString(), sourceBook: doc.fileName, entries },
+    `${doc.fileName.replace(/\.docx$/i, '')} - Decision Memory.json`);
+  $('dmIoMsg').textContent = `✓ Exported ${entries.length} ruling(s) as JSON.`;
+};
+$('dmExportCsvBtn').onclick = () => {
+  const entries = doc.decisionMemory.filter(e => e.decision);
+  if(!entries.length){ $('dmIoMsg').textContent = 'No approved rulings to export yet.'; return; }
+  downloadText(decisionMemoryToCsv(entries), `${doc.fileName.replace(/\.docx$/i, '')} - Decision Memory.csv`, 'text/csv');
+  $('dmIoMsg').textContent = `✓ Exported ${entries.length} ruling(s) as CSV.`;
+};
+$('dmImportBtn').onclick = () => $('dmImportInput').click();
+$('dmImportInput').onchange = async (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const text = await file.text();
+    let incoming = [];
+    if(/\.csv$/i.test(file.name)){
+      const rows = parseCsv(text);
+      const header = rows[0].map(h => h.trim().toLowerCase());
+      const termIdx = header.indexOf('term'), decisionIdx = header.indexOf('decision'), catIdx = header.indexOf('category');
+      if(termIdx === -1 || decisionIdx === -1) throw new Error('CSV needs "term" and "decision" columns.');
+      incoming = rows.slice(1).map(r => ({ term: r[termIdx], decision: r[decisionIdx], category: catIdx > -1 ? r[catIdx] : '' }));
+    } else {
+      const parsed = JSON.parse(text);
+      incoming = parsed.entries || parsed.decisionMemory || [];
+    }
+    if(!doc.decisionMemory) doc.decisionMemory = [];
+    const existing = new Set(doc.decisionMemory.map(e => e.term.toLowerCase()));
+    let added = 0;
+    incoming.forEach(e => {
+      if(!e.term || existing.has(e.term.toLowerCase())) return;
+      doc.decisionMemory.push({ id: `DM${Date.now().toString(36)}${Math.floor(Math.random() * 1000)}`, term: e.term, decision: e.decision || '', category: e.category || '' });
+      existing.add(e.term.toLowerCase());
+      added++;
+    });
+    save(); renderAll();
+    $('dmIoMsg').textContent = `✓ Imported ${added} ruling(s) from "${file.name}" (${incoming.length - added} skipped as duplicates).`;
+  }catch(err){
+    $('dmIoMsg').textContent = 'Import failed: ' + err.message;
+  }
+  $('dmImportInput').value = '';
 };
 $('dmList').addEventListener('click', e => {
   const removeBtn = e.target.closest('button[data-dmremove]');
@@ -532,7 +636,7 @@ $('dmList').addEventListener('click', e => {
   if(saveBtn){
     const entry = doc.decisionMemory.find(x => x.id === saveBtn.dataset.dmsaveedit);
     const newDecision = $('dmEditDecision').value.trim();
-    if(entry) entry.decision = newDecision;
+    if(entry){ entry.decision = newDecision; entry.category = $('dmEditCategory').value; }
     editingDmId = null;
     save(); renderDecisionMemory(); renderPrompt();
     return;

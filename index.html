@@ -126,9 +126,37 @@
             <div class="dm-add-row">
               <input type="text" id="dmTermInput" placeholder="Term (e.g. tawaqquf)">
               <textarea id="dmDecisionInput" class="dm-decision-input" placeholder="Ruling (e.g. keep the Arabic term, never translate it)" rows="2"></textarea>
+              <select id="dmCategoryInput" aria-label="Category">
+                <option value="">Category (optional)</option>
+                <option value="Character">Character</option>
+                <option value="Place">Place</option>
+                <option value="Religious/Cultural">Religious/Cultural</option>
+                <option value="Style">Style</option>
+                <option value="Transliteration">Transliteration</option>
+                <option value="Other">Other</option>
+              </select>
               <button class="primary-button" id="dmAddBtn">+ Add ruling</button>
             </div>
+            <div class="dm-filter-row">
+              <input type="search" id="dmSearch" placeholder="Search term or ruling…">
+              <select id="dmCategoryFilter" aria-label="Filter by category">
+                <option value="">All categories</option>
+                <option value="Character">Character</option>
+                <option value="Place">Place</option>
+                <option value="Religious/Cultural">Religious/Cultural</option>
+                <option value="Style">Style</option>
+                <option value="Transliteration">Transliteration</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
             <div id="dmList" class="dm-list"></div>
+            <div class="dm-io-row">
+              <button class="text-button" id="dmExportJsonBtn">⬇ Export JSON</button>
+              <button class="text-button" id="dmExportCsvBtn">⬇ Export CSV</button>
+              <button class="text-button" id="dmImportBtn">Import…</button>
+              <input type="file" id="dmImportInput" accept=".json,.csv" hidden>
+            </div>
+            <p id="dmIoMsg" class="hint-small backup-status"></p>
             <details class="step-section dm-suggest-section" id="dmSuggestSection">
               <summary><span class="chevron" aria-hidden="true">▸</span><h2>Suggest rulings via chatbot</h2></summary>
               <p class="hint-small">For terms with no ruling yet, ask a chatbot to propose one from the Translation Guide context — you still Accept or Reject each suggestion.</p>
