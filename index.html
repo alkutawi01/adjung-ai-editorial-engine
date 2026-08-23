@@ -19,13 +19,23 @@
 <div class="shell">
   <header class="topbar">
     <div class="brand"><span class="brand-word">Adjung</span><span class="brand-sub">TRANSLATION ENGINE</span></div>
-    <div class="topbar-right"><span id="savedState" class="saved">● Saved locally</span></div>
+    <div class="topbar-right"><span id="savedState" class="saved" title="Your manuscript and all work stay in this browser's local storage — nothing is uploaded to any server. The only thing that ever leaves this browser is the text you yourself copy into a chatbot. Use Backup (Final Review screen) to export everything to a file, or Restore to bring it back on another computer.">● Saved locally</span></div>
   </header>
 
   <section id="uploadScreen" class="upload-screen">
     <div class="upload-card">
       <h1>Upload manuscript (.docx)</h1>
-      <p class="hint">The system splits the text into small units automatically, roughly two paragraphs each.</p>
+      <p class="hint">The manuscript is split into small units sized for a chatbot's attention span — roughly 220 to 650 characters, grouped by actual paragraph content rather than a fixed paragraph count, so a one-line reply doesn't become its own unit. Chapter headings mark section boundaries; footnotes are carried along with the passage they belong to.</p>
+      <div class="whats-next">
+        <p class="whats-next-title">What happens next</p>
+        <ol>
+          <li>Chatbot reads the whole book once and writes a Book Profile (voice, genre, key terms)</li>
+          <li>Paraphrase each unit, side by side with the original, for you to approve or edit</li>
+          <li>Translate into your target language, same approve/edit review</li>
+          <li>Back-translate to literally mirror the translation, so drift is easy to catch</li>
+          <li>Final Review: compare all four versions side by side, mark each unit FINAL, export</li>
+        </ol>
+      </div>
       <input type="file" id="fileInput" accept=".docx" hidden>
       <button class="primary-button" id="chooseFileBtn">Choose .docx file</button>
       <p class="drop-hint">or drag a .docx file anywhere on this screen</p>

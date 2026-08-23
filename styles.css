@@ -121,6 +121,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .upload-card *{pointer-events:auto}
 .upload-card h1{margin:0 0 10px;font-size:22px}
 .upload-card .hint{color:var(--muted);font-size:12px;line-height:1.6;margin-bottom:20px}
+.whats-next{text-align:left;background:var(--paper);border:1px solid var(--line);border-radius:var(--r-md);padding:14px 16px;margin-bottom:22px}
+.whats-next-title{margin:0 0 8px;font:600 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--maroon)}
+.whats-next ol{margin:0;padding-left:18px;font-size:12px;line-height:1.7;color:var(--ink-soft)}
+.whats-next li{margin-bottom:2px}
 .drop-hint{margin:10px 0 0;color:var(--faint);font-size:11px}
 .file-name{margin-top:12px;font-size:12px;color:var(--muted)}
 .upload-error{margin-top:10px;color:var(--error);font-size:12px;min-height:14px}
