@@ -955,11 +955,13 @@ function renderUnitList(){
         ${isSelectable ? `<input type="checkbox" data-select="${escapeHtml(u.id)}" ${selected.has(u.id) ? 'checked' : ''}>` : '<span class="check-spacer"></span>'}
         <b>${escapeHtml(u.id)}</b>
         <span class="unit-status ${w.status}">${statusLabel(w.status)}</span>
+        ${w.grade ? `<span class="grade-badge grade-${w.grade}" title="Chatbot's self-reported confidence in this ${label.toLowerCase()}">${w.grade}</span>` : ''}
         ${u.final ? '<span class="unit-status approved">FINAL</span>' : ''}
       </div>
       ${fieldBlock('ORIGINAL TEXT', u.source, '', 'original')}
       ${refLabel ? fieldBlock(refLabel, refText, 'reference', mode === 'translation' ? 'parafrasa' : 'translation') : ''}
       ${w.status === 'stale' ? `<p class="stale-banner">⚠ ${statusLabel('stale')} — the text below is outdated. Pick this unit above to send it again.</p>` : ''}
+      ${w.grade === 'C' ? `<p class="grade-c-banner">⚠ Chatbot flagged low confidence on this ${label.toLowerCase()} — worth a closer read.</p>` : ''}
       ${editingUnitId === u.id
         ? `<div class="unit-field kind-${mode}"><small>${label} (editing)</small><textarea class="edit-textarea" id="editTextarea" dir="auto">${escapeHtml(w.text)}</textarea></div>
            <div class="unit-actions"><button class="text-button" data-canceledit="${escapeHtml(u.id)}">Cancel</button><button class="approve-button" data-saveedit="${escapeHtml(u.id)}">✓ Save</button></div>`
@@ -1034,6 +1036,14 @@ function memoryBlockFor(combinedText){
 // with trivial questions, which would undo the whole point of a fast copy/paste review loop.
 const CLARIFY_FORMAT_NOTE = `If — and only if — something is genuinely ambiguous or uncertain in a way that could change meaning (not a routine wording choice you're confident about), phrase it as a direct question the editor can answer with one click, using this exact format inside NOTES: [Q1] <question>. Use [Q2], [Q3]... if there's more than one in the same unit. Do not raise a [Q] for anything you already have a confident answer for.`;
 
+// A [Q] catches "I don't know what this means, you decide" — a specific, resolvable doubt about
+// meaning. It does NOT catch "I did my best but I'm not fully happy with this rendering" — a
+// softer self-assessment of the work's own quality, with no specific question to ask. A letter
+// grade (not a 0-100 number: LLM-reported percentages cluster in a narrow high band regardless of
+// actual quality — a coarse, honest category is more trustworthy than false numeric precision)
+// gives the editor a scan-and-triage signal across a whole batch without adding much prompt cost.
+const CONFIDENCE_GRADE_NOTE = `Also add a [CONFIDENCE] line with a single letter grade for your own work on this unit: A = fully confident, no reservations. B = reasonably confident, but a careful native reader might choose different wording or phrasing here. C = meaningfully uncertain about tone, register, or how well this rendering lands — flag it for closer human review. Grade honestly and use the full range — most units should not automatically be A.`;
+
 // Only added to a prompt when a selected unit actually carries a folded-in footnote — most
 // units don't, and repeating this instruction on every batch regardless would be exactly the
 // prompt-bloat this app already avoids for Book Profile terms and Decision Memory.
@@ -1049,7 +1059,7 @@ function renderPromptParafrasa(sel){
   const body = sel.map(u => `[UNIT: ${u.id}]\n${u.source}`).join('\n\n');
   return `YOU ARE: ${srcLang} language editor performing PARAPHRASE-ONLY work on a manuscript. Do not translate to another language. Do not change the author's position, meaning, or tone. Only rephrase, staying in ${srcLang}.
 ${footnoteNoteFor(sel)}${bookProfileBlockFor()}${memoryBlockFor(sel.map(u => u.source).join('\n'))}
-For EACH unit below, return a ${srcLang} paraphrase and a short note flagging anything ambiguous, uncertain, or needing human attention (leave NOTES empty if there is nothing to flag). ${CLARIFY_FORMAT_NOTE}
+For EACH unit below, return a ${srcLang} paraphrase and a short note flagging anything ambiguous, uncertain, or needing human attention (leave NOTES empty if there is nothing to flag). ${CLARIFY_FORMAT_NOTE} ${CONFIDENCE_GRADE_NOTE}
 
 UNITS:
 ${body}
@@ -1057,6 +1067,8 @@ ${body}
 Return EXACTLY this format, once per unit, in the same order, using the same [UNIT: id] markers:
 [UNIT: <id>]
 [PARAPHRASE]
+...
+[CONFIDENCE]
 ...
 [NOTES]
 ...
@@ -1077,7 +1089,7 @@ WRITE LIKE ${/^[aeiou]/i.test(lang) ? 'AN' : 'A'} ${lang.toUpperCase()} NOVELIST
 - If the source's sentence structure would produce several consecutive ${lang} sentences starting with the same subject pronoun (e.g. "I... I... I..."), vary the sentence openings the way a ${lang} novelist would, without changing who is doing what.
 - A local dialect, register, or texture in the source (e.g. a distinctive regional accent, a class of speech, a turn of phrase specific to one place) usually has no exact ${lang} equivalent — don't flatten it into a plain explanatory phrase. Translate the literal meaning as best you can, then use NOTES to flag that a texture was lost, so the editor can decide whether it needs a Decision Memory ruling for consistency across the book.
 ${footnoteNoteFor(sel)}${bookProfileBlockFor()}${memoryBlockFor(sel.map(u => u.source + '\n' + u.parafrasa.text).join('\n'))}
-For EACH unit below, return a translation into ${lang} and a short note flagging anything ambiguous, uncertain, a lost cultural texture, or needing human attention (leave NOTES empty if there is nothing to flag). ${CLARIFY_FORMAT_NOTE}
+For EACH unit below, return a translation into ${lang} and a short note flagging anything ambiguous, uncertain, a lost cultural texture, or needing human attention (leave NOTES empty if there is nothing to flag). ${CLARIFY_FORMAT_NOTE} ${CONFIDENCE_GRADE_NOTE}
 
 UNITS:
 ${body}
@@ -1085,6 +1097,8 @@ ${body}
 Return EXACTLY this format, once per unit, in the same order, using the same [UNIT: id] markers:
 [UNIT: <id>]
 [TRANSLATION]
+...
+[CONFIDENCE]
 ...
 [NOTES]
 ...
@@ -1098,7 +1112,7 @@ function renderPromptBackTranslation(sel){
 
 Do NOT improve, polish, reinterpret, or correct anything. Do NOT try to make it read naturally. Literalness matters more than elegance here. This is a mirror used to detect meaning drift against the original text, not a new translation.
 ${footnoteNoteFor(sel, u => u.translation.text)}
-For EACH unit below, return the literal back-translation and a short note only if something is structurally impossible to render literally (leave NOTES empty otherwise). ${CLARIFY_FORMAT_NOTE}
+For EACH unit below, return the literal back-translation and a short note only if something is structurally impossible to render literally (leave NOTES empty otherwise). ${CLARIFY_FORMAT_NOTE} ${CONFIDENCE_GRADE_NOTE}
 
 UNITS:
 ${body}
@@ -1106,6 +1120,8 @@ ${body}
 Return EXACTLY this format, once per unit, in the same order, using the same [UNIT: id] markers:
 [UNIT: <id>]
 [BACK_TRANSLATION]
+...
+[CONFIDENCE]
 ...
 [NOTES]
 ...
@@ -1729,7 +1745,9 @@ $('processBtn').onclick = () => {
     const text = extractLabeled(chunk, fieldLabel);
     if(!text) return;
     const { notes, clarifications } = parseClarifications(extractLabeled(chunk, 'NOTES'));
-    u[targetField] = { text, notes, clarifications, status: 'pending' };
+    const gradeRaw = extractLabeled(chunk, 'CONFIDENCE').trim().toUpperCase().charAt(0);
+    const grade = ['A', 'B', 'C'].includes(gradeRaw) ? gradeRaw : null;
+    u[targetField] = { text, notes, clarifications, grade, status: 'pending' };
     if(!firstAppliedId) firstAppliedId = id;
     applied++;
   });

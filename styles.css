@@ -218,6 +218,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .unit-status.rejected{background:var(--error-tint);color:var(--error)}
 .unit-status.stale{background:var(--warn-tint);color:var(--warn);border:1px solid var(--warn)}
 .stale-banner{margin:10px 0 0;padding:8px 11px;border-radius:var(--r-sm);background:var(--warn-tint);color:var(--warn);font:600 12px var(--font-sans);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+
+.grade-badge{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font:700 10px var(--font-mono);color:#fff}
+.grade-badge.grade-A{background:var(--success)}
+.grade-badge.grade-B{background:var(--warn)}
+.grade-badge.grade-C{background:var(--error)}
+.grade-c-banner{margin:10px 0 0;padding:7px 11px;border-radius:var(--r-sm);background:var(--error-tint);color:var(--error);font:600 12px var(--font-sans)}
 .stale-banner .text-button{color:var(--warn);white-space:nowrap}
 
 /* Sticks to the bottom of the viewport for as long as any part of ITS OWN card is still on
