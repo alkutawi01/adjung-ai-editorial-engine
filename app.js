@@ -1455,14 +1455,21 @@ function buildReadableWordDoc(finalUnits, titleLine, subtitleLine){
     byChapter.get(u.chapter).push(u);
   });
 
+  // A unit flagged sceneBreakAfter had its own "***" line stripped out at upload time (folded
+  // into a UI marker instead) — the export was never told to put anything back in its place, so
+  // a real scene/time-jump in the manuscript silently became a seamless paragraph run in the
+  // exported .doc. Same marker convention as the source, centered like a real scene break.
   const chapterHtml = [...byChapter.entries()].map(([chapter, units]) => {
-    const body = units.map(u => {
+    const body = units.map((u, i) => {
       const text = (u.translation.text || '').trim();
       if(!text) return '';
-      return text.split(/\n\s*\n/).map(p => {
+      const paras = text.split(/\n\s*\n/).map(p => {
         const clean = escapeHtml(p.replace(/\n/g, ' ').trim());
         return clean ? `<p style="margin:0 0 12pt 0;text-indent:24pt;text-align:justify;">${clean}</p>` : '';
       }).join('');
+      const isLast = i === units.length - 1;
+      const breakHtml = (u.sceneBreakAfter && !isLast) ? `<p style="margin:6pt 0 18pt;text-align:center;">* * *</p>` : '';
+      return paras + breakHtml;
     }).join('');
     return `<h1 style="font-size:16pt;margin:24pt 0 18pt 0;">${escapeHtml(chapter)}</h1>${body}`;
   }).join('<br clear="all" style="page-break-before:always">');
