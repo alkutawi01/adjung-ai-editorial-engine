@@ -1237,7 +1237,12 @@ $('unitList').addEventListener('click', e => {
   if(saveEditBtn){
     const u = doc.units.find(x => x.id === saveEditBtn.dataset.saveedit);
     const newText = $('editTextarea').value.trim();
+    const changed = u && newText && newText !== workField(u).text;
     if(u && newText) workField(u).text = newText;
+    // Same rule as Final Review's inline edit: changing an already-approved Paraphrase or
+    // Translation text here is possible (Edit stays available after approval), and a unit
+    // marked FINAL depends on all three stages being correct — not just the one being edited.
+    if(changed && u.final) u.final = false;
     editingUnitId = null;
     save(); renderUnitList();
     return;
@@ -1274,7 +1279,12 @@ $('unitList').addEventListener('click', e => {
   }
   if(rejectBtn){
     const u = doc.units.find(x => x.id === rejectBtn.dataset.reject);
-    if(u){ workField(u).status = 'rejected'; if(mode === 'backtranslation') u.final = false; }
+    // FINAL depends on Paraphrase, Translation, AND Back Translation all being correct — a real
+    // gap Codex caught: rejecting or reopening any ONE of the three (this button doubles as both
+    // "Reject" on a pending unit and "Reopen for review" on an approved one) left FINAL standing
+    // even though the stage it depends on had just been pulled out from under it. Not just a
+    // Back Translation special case — every stage unmarks FINAL the same way.
+    if(u){ workField(u).status = 'rejected'; u.final = false; }
     save(); renderAll();
   }
   if(finalBtn){
