@@ -51,7 +51,7 @@ const BOOK_PROFILE_FIELDS = [
   { key: 'targetReaders', tag: 'TARGET_READERS', label: 'Target readers', max: 250 },
   { key: 'authorVoice', tag: 'AUTHOR_VOICE', label: "Author's voice", max: 350 },
   { key: 'languageStyle', tag: 'LANGUAGE_STYLE', label: 'Language style', max: 350 },
-  { key: 'argumentStructure', tag: 'ARGUMENT_STRUCTURE', label: 'Argument structure', max: 400 },
+  { key: 'argumentStructure', tag: 'ARGUMENT_STRUCTURE', label: 'Structure', max: 400 },
   { key: 'keyTerms', tag: 'KEY_TERMS', label: 'Key terms', max: 500 },
   { key: 'translationRisks', tag: 'TRANSLATION_RISKS', label: 'Translation risks', max: 400 },
   { key: 'processingRecommendations', tag: 'PROCESSING_RECOMMENDATIONS', label: 'Processing recommendations', max: 400 }
@@ -238,15 +238,28 @@ ${fieldBlocks}
 `;
 }
 
+// "Reject and redo" alone means one wrong field (say, a mistranscribed Key Terms list) forces
+// throwing away eight fields that were fine and re-running the whole book through a chatbot
+// again. Per-field editing turns a partial fix into a partial fix, not a full do-over.
+let editingBpField = null;
+
 function renderBookProfilePanel(){
   const bp = doc.bookProfile;
   const fieldsHtml = BOOK_PROFILE_FIELDS.map(f => {
     const val = (bp.fields && bp.fields[f.key]) || '';
     const over = val.length > f.max;
     const title = over ? `title="The chatbot ran a little long here. Not an error — shorter just keeps every field skimmable and consistent across the book. Edit the field if you want to trim it."` : '';
-    return `<div class="bp-field">
+    if(editingBpField === f.key){
+      return `<div class="bp-field bp-field-editing">
+        <div class="bp-field-head"><small>${escapeHtml(f.label)} (editing)</small></div>
+        <textarea class="edit-textarea" id="editBpTextarea" dir="auto">${escapeHtml(val)}</textarea>
+        <div class="unit-actions"><button class="text-button" id="bpCancelFieldEdit">Cancel</button><button class="approve-button" id="bpSaveFieldEdit" data-field="${f.key}">✓ Save</button></div>
+      </div>`;
+    }
+    return `<div class="bp-field final-field-wrap">
       <div class="bp-field-head"><small>${escapeHtml(f.label)}</small><span class="bp-field-count${over ? ' over' : ''}" ${title}>${val.length}/${f.max}</span></div>
       ${val ? `<p dir="auto">${escapeHtml(val)}</p>` : '<p class="bp-field-empty">Not provided by the chatbot.</p>'}
+      <button class="text-button edit-button final-edit-btn" data-editbp="${f.key}">✎ Edit</button>
     </div>`;
   }).join('');
 
@@ -255,9 +268,12 @@ function renderBookProfilePanel(){
     $('bookProfileActions').innerHTML = '';
     return;
   }
-  $('bookProfileFields').innerHTML = fieldsHtml;
+  const filledCount = BOOK_PROFILE_FIELDS.filter(f => (bp.fields && bp.fields[f.key])).length;
+  const overCount = BOOK_PROFILE_FIELDS.filter(f => (bp.fields && bp.fields[f.key] || '').length > f.max).length;
+  const validationLine = `<p class="bp-validation${filledCount < BOOK_PROFILE_FIELDS.length ? ' bp-validation-warn' : ''}">${filledCount}/${BOOK_PROFILE_FIELDS.length} fields complete${overCount ? ` · ${overCount} running long (not an error)` : ''}</p>`;
+  $('bookProfileFields').innerHTML = validationLine + fieldsHtml;
   $('bookProfileActions').innerHTML = bp.status === 'pending'
-    ? `<button class="reject-button" id="bpReject">Reject and redo</button><button class="approve-button" id="bpApprove">✓ Approve Book Profile</button>`
+    ? `<button class="reject-button" id="bpReject">Reject and redo</button><button class="approve-button" id="bpApprove">✓ Approve Book Profile &amp; Start Paraphrase</button>`
     : `<button class="reject-button" id="bpReopen">Reopen for review</button>`;
   if($('bpApprove')) $('bpApprove').onclick = () => {
     doc.bookProfile.status = 'approved'; save(); renderAll(); setPhase('parafrasa');
@@ -267,6 +283,31 @@ function renderBookProfilePanel(){
   };
   if($('bpReopen')) $('bpReopen').onclick = () => {
     doc.bookProfile.status = 'pending'; save(); renderAll();
+  };
+  renderKeyTermsImport();
+}
+
+// Key Terms is a comma-separated list the chatbot already produced from reading the whole book —
+// turning it into one-click Decision Memory entries (with an empty ruling to fill in) is much
+// less friction than retyping each term by hand into the Decision Memory form later, term by term.
+function renderKeyTermsImport(){
+  const box = $('bpKeyTermsImport');
+  if(!box) return;
+  const bp = doc.bookProfile;
+  const raw = bp?.fields?.keyTerms || '';
+  const terms = [...new Set(raw.split(',').map(t => t.trim()).filter(Boolean))];
+  const existing = new Set((doc.decisionMemory || []).map(e => e.term.toLowerCase()));
+  const newTerms = terms.filter(t => !existing.has(t.toLowerCase()));
+  if(!terms.length){ box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = newTerms.length
+    ? `<p class="hint-small">Key Terms recognised ${terms.length} term(s). Add the ${newTerms.length} not yet in Decision Memory as empty entries ready for you to fill in a ruling?</p>
+       <button class="text-button" id="bpImportTerms">+ Add ${newTerms.length} term(s) to Decision Memory</button>`
+    : `<p class="hint-small">All ${terms.length} Key Terms already have a Decision Memory entry.</p>`;
+  if($('bpImportTerms')) $('bpImportTerms').onclick = () => {
+    if(!doc.decisionMemory) doc.decisionMemory = [];
+    newTerms.forEach(term => doc.decisionMemory.push({ id: `DM${Date.now().toString(36)}${Math.floor(Math.random()*1000)}`, term, decision: '' }));
+    save(); renderAll();
   };
 }
 
@@ -287,17 +328,45 @@ $('processBookProfileBtn').onclick = () => {
   renderAll();
 };
 
+$('bookProfileFields').addEventListener('click', e => {
+  const editBtn = e.target.closest('button[data-editbp]');
+  const cancelBtn = e.target.closest('button#bpCancelFieldEdit');
+  const saveBtn = e.target.closest('button#bpSaveFieldEdit');
+  if(editBtn){ editingBpField = editBtn.dataset.editbp; renderBookProfilePanel(); return; }
+  if(cancelBtn){ editingBpField = null; renderBookProfilePanel(); return; }
+  if(saveBtn){
+    if(!doc.bookProfile.fields) doc.bookProfile.fields = {};
+    doc.bookProfile.fields[saveBtn.dataset.field] = $('editBpTextarea').value.trim();
+    editingBpField = null;
+    save(); renderAll();
+    return;
+  }
+});
+
 // ---- Decision Memory ---------------------------------------------------------
+let editingDmId = null;
+
 function renderDecisionMemory(){
   if(!doc.decisionMemory) doc.decisionMemory = [];
   $('dmCount').textContent = String(doc.decisionMemory.length);
   const list = $('dmList');
   if(!doc.decisionMemory.length){ list.innerHTML = '<p class="dm-empty">No rulings saved yet.</p>'; return; }
-  list.innerHTML = doc.decisionMemory.map(e => `
-    <div class="dm-entry">
-      <div class="dm-entry-head"><span class="dm-entry-term" dir="auto">${escapeHtml(e.term)}</span><button class="dm-remove" data-dmremove="${escapeHtml(e.id)}">Remove</button></div>
-      <p class="dm-entry-decision" dir="auto">${escapeHtml(e.decision)}</p>
-    </div>`).join('');
+  list.innerHTML = doc.decisionMemory.map(e => {
+    if(editingDmId === e.id){
+      return `<div class="dm-entry">
+        <div class="dm-entry-head"><span class="dm-entry-term" dir="auto">${escapeHtml(e.term)}</span></div>
+        <textarea class="dm-decision-input" id="dmEditDecision" rows="2" placeholder="Ruling for this term…">${escapeHtml(e.decision)}</textarea>
+        <div class="unit-actions"><button class="text-button" data-dmcanceledit="1">Cancel</button><button class="approve-button" data-dmsaveedit="${escapeHtml(e.id)}">✓ Save</button></div>
+      </div>`;
+    }
+    // A term imported from Key Terms starts with no ruling — flag it so it doesn't sit forgotten
+    // and silently do nothing (an empty decision never matches a chatbot instruction to follow).
+    const empty = !e.decision;
+    return `<div class="dm-entry">
+      <div class="dm-entry-head"><span class="dm-entry-term" dir="auto">${escapeHtml(e.term)}</span><span class="dm-entry-actions"><button class="dm-remove" data-dmedit="${escapeHtml(e.id)}">Edit</button><button class="dm-remove" data-dmremove="${escapeHtml(e.id)}">Remove</button></span></div>
+      <p class="dm-entry-decision${empty ? ' dm-entry-empty' : ''}" dir="auto">${e.decision ? escapeHtml(e.decision) : 'No ruling yet — click Edit to add one. Until then this term is not sent to the chatbot.'}</p>
+    </div>`;
+  }).join('');
 }
 
 $('dmAddBtn').onclick = () => {
@@ -313,10 +382,25 @@ $('dmAddBtn').onclick = () => {
   save(); renderDecisionMemory(); renderPrompt();
 };
 $('dmList').addEventListener('click', e => {
-  const btn = e.target.closest('button[data-dmremove]');
-  if(!btn) return;
-  doc.decisionMemory = doc.decisionMemory.filter(x => x.id !== btn.dataset.dmremove);
-  save(); renderDecisionMemory(); renderPrompt();
+  const removeBtn = e.target.closest('button[data-dmremove]');
+  const editBtn = e.target.closest('button[data-dmedit]');
+  const saveBtn = e.target.closest('button[data-dmsaveedit]');
+  const cancelBtn = e.target.closest('button[data-dmcanceledit]');
+  if(removeBtn){
+    doc.decisionMemory = doc.decisionMemory.filter(x => x.id !== removeBtn.dataset.dmremove);
+    save(); renderDecisionMemory(); renderPrompt();
+    return;
+  }
+  if(editBtn){ editingDmId = editBtn.dataset.dmedit; renderDecisionMemory(); return; }
+  if(cancelBtn){ editingDmId = null; renderDecisionMemory(); return; }
+  if(saveBtn){
+    const entry = doc.decisionMemory.find(x => x.id === saveBtn.dataset.dmsaveedit);
+    const newDecision = $('dmEditDecision').value.trim();
+    if(entry) entry.decision = newDecision;
+    editingDmId = null;
+    save(); renderDecisionMemory(); renderPrompt();
+    return;
+  }
 });
 
 // Scholarly transliteration in the manuscript ("shimāgh", "ṣaḥabiyyāh") will not be typed back
@@ -337,7 +421,10 @@ function termAppearsIn(text, term){
 }
 function relevantDecisionMemory(text){
   if(!doc?.decisionMemory?.length) return [];
-  return doc.decisionMemory.filter(e => termAppearsIn(text, e.term));
+  // An entry imported from Key Terms with no ruling filled in yet has nothing useful to tell a
+  // chatbot — "- term: " with a blank instruction is confusing, not helpful. Skip it until the
+  // editor actually writes a ruling.
+  return doc.decisionMemory.filter(e => e.decision && termAppearsIn(text, e.term));
 }
 
 // ---- Phases ------------------------------------------------------------------
