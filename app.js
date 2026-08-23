@@ -997,8 +997,29 @@ function renderPromptSummary(promptText, sel){
   }
 }
 
+// Which of Step A/B/C the editor is actually on right now, driven by state rather than a
+// separate flag — picked-but-not-copied is Step B, copied-and-sent is Step C, anything else
+// (including right after a batch finishes and there's nothing outstanding) falls back to Step A.
+function renderBatchAccordion(){
+  if(!BATCH_PHASES.includes(phase)) return;
+  const sel = (doc?.units || []).filter(u => selected.has(u.id));
+  const sentCount = (doc?.units || []).filter(u => workField(u).status === 'sent').length;
+  const pendingCount = (doc?.units || []).filter(u => workField(u).status === 'pending').length;
+  const active = sentCount ? 'C' : sel.length ? 'B' : 'A';
+  $('stepA').open = active === 'A';
+  $('stepB').open = active === 'B';
+  $('stepC').open = active === 'C';
+  $('stepASummary').textContent = sel.length ? `${sel.length} unit(s) picked`
+    : pendingCount || sentCount ? `${pendingCount} awaiting review · ${sentCount} sent` : 'Nothing picked yet';
+  $('stepBSummary').textContent = sel.length ? `Prompt ready for ${sel.length} unit(s)`
+    : sentCount ? 'Sent — waiting for a reply' : 'Pick units first';
+  $('stepCSummary').textContent = sentCount ? `${sentCount} unit(s) sent, waiting for a reply`
+    : pendingCount ? `${pendingCount} unit(s) awaiting your review` : 'Nothing to paste yet';
+}
+
 function renderPrompt(){
   if(!BATCH_PHASES.includes(phase)) return;
+  renderBatchAccordion();
   const sel = (doc?.units || []).filter(u => selected.has(u.id));
   const stats = batchStatsFor(sel);
   $('selectedCount').textContent = `${sel.length} selected · ${stats.chars}/${BATCH_MAX_CHARS} chars · ${stats.sentences}/${BATCH_MAX_SENTENCES} sentences`;

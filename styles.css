@@ -297,6 +297,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .dm-suggestion p{margin:0 0 8px;font-size:12px;line-height:1.5;color:var(--ink-soft)}
 .dm-suggestion .unit-actions{margin:0}
 .dm-summary-line{margin:0;font-weight:400;text-transform:none;letter-spacing:0}
+.step-summary-line{margin:0;font-weight:400;text-transform:none;letter-spacing:0}
+.batch-step[open]>summary h2{color:var(--maroon)}
 
 /* Deliberately looks like its own bordered card, not inline text near the input — a suggestion
    that reads as plain text next to the field gets misread as the field having auto-filled

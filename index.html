@@ -135,8 +135,13 @@
             <p id="sentBanner" class="batch-warning" role="status"></p>
             <button class="text-button" id="clearSentBtn">Clear sent status (mark as failed, allow re-pick)</button>
           </div>
-          <div class="sidebar-section">
-            <h2>Step A · Pick units</h2>
+
+          <!-- Only the step the editor is actually on stays open; the other two collapse to a
+               one-line summary of what happened in them, so this batch loop (pick → copy → paste,
+               repeated dozens of times per manuscript) doesn't ask the editor to re-parse all
+               three steps' worth of controls on every single pass. -->
+          <details class="sidebar-section step-section batch-step" id="stepA">
+            <summary><h2>Step A · Pick units</h2><p id="stepASummary" class="hint-small step-summary-line"></p></summary>
             <input type="search" id="unitSearch" placeholder="Search text or unit ID…">
             <div class="select-row">
               <button class="text-button" id="selectAllBtn">Select all filtered</button>
@@ -146,22 +151,22 @@
             <p class="hint-small">Limits exist because a chatbot's reply can cut out mid-batch on very long prompts, and a smaller batch is easier to review carefully. "Suggested batch" adds up to 5 more not-yet-started units, good for one comfortable review pass; "Select all filtered" fills up to the hard limit below in one go.</p>
             <p id="selectedCount" class="selected-count">0 selected</p>
             <p id="batchWarning" class="batch-warning" role="status"></p>
-          </div>
-          <div class="sidebar-section grow">
-            <h2>Step B · Copy prompt</h2>
+          </details>
+          <details class="sidebar-section step-section batch-step" id="stepB">
+            <summary><h2>Step B · Copy prompt</h2><p id="stepBSummary" class="hint-small step-summary-line"></p></summary>
             <p id="promptSummary" class="prompt-summary" hidden></p>
             <textarea id="promptOut" class="prompt-out" readonly placeholder="Pick units on the right to build a prompt…"></textarea>
             <button class="copy-button" id="copyPromptBtn">▣ Copy prompt</button>
-          </div>
-          <div class="sidebar-section">
-            <h2>Step C · Paste the reply</h2>
+          </details>
+          <details class="sidebar-section step-section batch-step" id="stepC">
+            <summary><h2>Step C · Paste the reply</h2><p id="stepCSummary" class="hint-small step-summary-line"></p></summary>
             <p class="hint-small">Status goes Sent → Awaiting review → Approved as you copy, then paste, then approve. If a copy failed or was never actually sent, a "Clear sent status" option appears above (next to the unit list) once anything is marked Sent — use it to unstick that unit and pick it again.</p>
             <textarea id="pasteIn" class="paste-in" placeholder="Paste the chatbot's full reply here…"></textarea>
             <p id="pasteInStatus" class="hint-small paste-status"></p>
             <button class="primary-button" id="processBtn">Process &amp; Save →</button>
             <p id="parseError" class="upload-error" role="alert"></p>
             <p id="parseSuccess" class="parse-success" role="status"></p>
-          </div>
+          </details>
         </div>
 
         <div class="phase-tools" id="toolsFinal" hidden>
