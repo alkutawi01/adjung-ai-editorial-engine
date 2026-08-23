@@ -105,9 +105,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .phase-tab.locked{cursor:not-allowed;opacity:.4}
 .phase-num{display:inline-grid;place-items:center;width:19px;height:19px;border-radius:50%;background:#efedeb;color:#78716c;font:700 10px var(--font-sans);transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
 .phase-tab.active .phase-num{background:var(--maroon);color:#fff}
-.phase-badge{font:600 9px var(--font-mono);text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.phase-badge{font:600 9px var(--font-mono);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);max-width:150px;white-space:normal;text-align:left;line-height:1.3}
 .phase-badge.pending{color:var(--warn)}
 .phase-badge.done{color:var(--success)}
+.phase-badge.locked{color:var(--faint);font-style:italic;text-transform:none;letter-spacing:0}
 .phase-intro{margin:0;padding:11px 13px;border-left:2px solid var(--maroon);background:var(--paper);color:#44403c;font-size:12px;line-height:1.55;border-radius:0 var(--r-sm) var(--r-sm) 0}
 .phase-tools{display:contents}
 .book-switch-row{display:flex;flex-direction:column;gap:6px;margin-top:8px}
@@ -292,8 +293,13 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .dm-suggestion .unit-actions{margin:0}
 .dm-summary-line{margin:0;font-weight:400;text-transform:none;letter-spacing:0}
 
-.lang-suggest{margin:-4px 0 8px;font-size:11px;color:var(--muted)}
-.lang-suggest button{border:0;background:transparent;color:var(--maroon);font:600 11px var(--font-sans);cursor:pointer;padding:0;text-decoration:underline}
+/* Deliberately looks like its own bordered card, not inline text near the input — a suggestion
+   that reads as plain text next to the field gets misread as the field having auto-filled
+   itself, which defeats the entire point of it being an editable, non-binding suggestion. */
+.lang-suggest{margin:-2px 0 10px;padding:7px 10px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--paper);font-size:11px;line-height:1.6;color:var(--muted)}
+.lang-suggest .lang-suggest-note{display:block;margin-top:2px;color:var(--faint)}
+.lang-suggest button{border:1px solid var(--maroon);background:#fff;color:var(--maroon);font:600 10px var(--font-sans);cursor:pointer;padding:3px 9px;border-radius:var(--r-full);margin-left:4px}
+.lang-suggest button:hover{background:var(--maroon);color:#fff}
 
 .prompt-summary{margin:0 0 8px;padding:7px 10px;border-radius:var(--r-sm);background:var(--paper);border:1px solid var(--line);font-size:11px;line-height:1.6;color:var(--muted)}
 .prompt-summary b{color:var(--ink-soft)}
@@ -303,6 +309,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .paste-status.warn{color:var(--warn)}
 
 .scene-break-marker{text-align:center;color:var(--faint);font:600 10px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;margin:-4px 0}
+
+.backup-status{color:var(--muted)}
+.target-lang-row{margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
+.prompt-summary .summary-toggle{border:0;background:transparent;color:var(--maroon);font:600 11px var(--font-sans);cursor:pointer;padding:0;text-decoration:underline}
+.prompt-summary-preview{margin-top:6px;padding-top:6px;border-top:1px dashed var(--line-strong);white-space:pre-wrap;color:var(--ink-soft)}
 
 .parse-success{margin:6px 0 0;color:var(--success);font-size:12px;min-height:14px}
 .edit-textarea{width:100%;min-height:120px;padding:9px 11px;border:1.5px solid var(--maroon);border-radius:var(--r-md);font:14px/1.6 var(--font-serif);color:#292524;resize:vertical;box-shadow:var(--focus-ring)}

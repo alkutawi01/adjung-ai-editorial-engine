@@ -19,7 +19,7 @@
 <div class="shell">
   <header class="topbar">
     <div class="brand"><span class="brand-word">Adjung</span><span class="brand-sub">TRANSLATION ENGINE</span></div>
-    <div class="topbar-right"><span id="savedState" class="saved" title="Your manuscript and all work stay in this browser's local storage — nothing is uploaded to any server. The only thing that ever leaves this browser is the text you yourself copy into a chatbot. Use Backup (Final Review screen) to export everything to a file, or Restore to bring it back on another computer.">● Saved locally</span></div>
+    <div class="topbar-right"><span id="savedState" class="saved" title="Your manuscript and all work stay in this browser's local storage — nothing is uploaded to any server. The only thing that ever leaves this browser is the text you yourself copy into a chatbot. Use Backup (sidebar, visible at every stage) to export everything to a file, or Restore to bring it back on another computer.">● Saved locally</span></div>
   </header>
 
   <section id="uploadScreen" class="upload-screen">
@@ -69,7 +69,7 @@
           <button class="copy-button" id="backupBtn">⬇ Download full backup</button>
           <input type="file" id="restoreInput" accept=".json" hidden>
           <button class="text-button" id="restoreBtn">Restore from backup…</button>
-          <p id="backupMsg" class="parse-success" role="status"></p>
+          <p id="backupMsg" class="hint-small backup-status"></p>
         </div>
 
         <div class="phase-tools" id="toolsScan">
@@ -99,7 +99,7 @@
             <h2>Manuscript's source language <span class="required-mark">required</span></h2>
             <p class="hint-small">This is what the paraphrase prompt tells the chatbot to write in — a manuscript with more than one language can have this changed per batch.</p>
             <input type="text" id="sourceLangInput" placeholder="e.g. Malay, English…">
-            <p id="sourceLangSuggest" class="lang-suggest" hidden></p>
+            <div id="sourceLangSuggest" class="lang-suggest" hidden></div>
           </div>
           <div class="sidebar-section" id="targetLangSection" hidden>
             <h2>Target language <span class="required-mark">required</span></h2>
@@ -136,7 +136,7 @@
               <button class="text-button" id="suggestBatchBtn">Suggested batch</button>
               <button class="text-button" id="selectNoneBtn">Clear</button>
             </div>
-            <p class="hint-small">Limits exist because a chatbot's reply can cut out mid-batch on very long prompts, and a smaller batch is easier to review carefully. "Suggested batch" picks a round-trip-sized batch (~5 units); "Select all filtered" fills up to the hard limit below.</p>
+            <p class="hint-small">Limits exist because a chatbot's reply can cut out mid-batch on very long prompts, and a smaller batch is easier to review carefully. "Suggested batch" adds up to 5 more not-yet-started units, good for one comfortable review pass; "Select all filtered" fills up to the hard limit below in one go.</p>
             <p id="selectedCount" class="selected-count">0 selected</p>
             <p id="batchWarning" class="batch-warning" role="status"></p>
           </div>
@@ -148,7 +148,7 @@
           </div>
           <div class="sidebar-section">
             <h2>Step C · Paste the reply</h2>
-            <p class="hint-small">Status goes Sent → Awaiting review → Approved as you copy, then paste, then approve. If a copy failed or was never actually sent, use "Clear sent status" above to unstick it and pick the unit again.</p>
+            <p class="hint-small">Status goes Sent → Awaiting review → Approved as you copy, then paste, then approve. If a copy failed or was never actually sent, a "Clear sent status" option appears above (next to the unit list) once anything is marked Sent — use it to unstick that unit and pick it again.</p>
             <textarea id="pasteIn" class="paste-in" placeholder="Paste the chatbot's full reply here…"></textarea>
             <p id="pasteInStatus" class="hint-small paste-status"></p>
             <button class="primary-button" id="processBtn">Process &amp; Save →</button>
@@ -175,7 +175,7 @@
           <div class="filter-row" id="filterRow">
             <select id="statusFilter"></select>
             <select id="chapterFilter"><option value="">All sections</option></select>
-            <label class="single-card-toggle"><input type="checkbox" id="singleCardToggle"> One at a time</label>
+            <label class="single-card-toggle" title="Show one unit per screen instead of a scrolling list — slower to review, but each reply is smaller so there's less for a chatbot to get wrong."><input type="checkbox" id="singleCardToggle"> Process one unit at a time</label>
           </div>
         </div>
         <div id="bookProfilePanel" hidden>
