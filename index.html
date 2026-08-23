@@ -99,6 +99,15 @@
               <button class="primary-button" id="dmAddBtn">+ Add ruling</button>
             </div>
             <div id="dmList" class="dm-list"></div>
+            <details class="step-section dm-suggest-section" id="dmSuggestSection">
+              <summary><h2>Suggest rulings via chatbot</h2></summary>
+              <p class="hint-small">For terms with no ruling yet, ask a chatbot to propose one from the Book Profile context — you still Accept or Reject each suggestion.</p>
+              <textarea id="dmSuggestPromptOut" class="prompt-out dm-suggest-prompt" readonly></textarea>
+              <button class="copy-button" id="dmCopySuggestBtn">▣ Copy prompt</button>
+              <textarea id="dmSuggestPasteIn" class="paste-in" placeholder="Paste the chatbot's suggestions here…"></textarea>
+              <button class="primary-button" id="dmProcessSuggestBtn">Process suggestions →</button>
+              <p id="dmSuggestError" class="upload-error" role="alert"></p>
+            </details>
           </details>
           <div class="sidebar-section" id="sentBannerSection" hidden>
             <p id="sentBanner" class="batch-warning" role="status"></p>

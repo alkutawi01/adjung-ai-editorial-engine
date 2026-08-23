@@ -285,6 +285,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .dm-entry-head{align-items:center}
 .dm-entry-actions{display:flex;gap:10px;flex-shrink:0}
 .dm-entry-empty{color:var(--warn);font-style:italic}
+.dm-suggest-section h2{font-size:11px}
+.dm-suggest-prompt{min-height:100px}
+.dm-suggestion{margin-top:6px;padding:8px 10px;border-radius:var(--r-sm);background:var(--maroon-tint);border:1px solid #e0b6bd}
+.dm-suggestion p{margin:0 0 8px;font-size:12px;line-height:1.5;color:var(--ink-soft)}
+.dm-suggestion .unit-actions{margin:0}
 
 .parse-success{margin:6px 0 0;color:var(--success);font-size:12px;min-height:14px}
 .edit-textarea{width:100%;min-height:120px;padding:9px 11px;border:1.5px solid var(--maroon);border-radius:var(--r-md);font:14px/1.6 var(--font-serif);color:#292524;resize:vertical;box-shadow:var(--focus-ring)}

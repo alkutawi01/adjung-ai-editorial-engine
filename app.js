@@ -362,12 +362,83 @@ function renderDecisionMemory(){
     // A term imported from Key Terms starts with no ruling — flag it so it doesn't sit forgotten
     // and silently do nothing (an empty decision never matches a chatbot instruction to follow).
     const empty = !e.decision;
+    const suggestionHtml = (e.suggestion && !e.decision) ? `<div class="dm-suggestion">
+        <p dir="auto"><small>AI SUGGESTION</small><br>${escapeHtml(e.suggestion)}</p>
+        <div class="unit-actions"><button class="reject-button" data-dmrejectsuggest="${escapeHtml(e.id)}">Reject</button><button class="approve-button" data-dmacceptsuggest="${escapeHtml(e.id)}">✓ Accept</button></div>
+      </div>` : '';
     return `<div class="dm-entry">
       <div class="dm-entry-head"><span class="dm-entry-term" dir="auto">${escapeHtml(e.term)}</span><span class="dm-entry-actions"><button class="dm-remove" data-dmedit="${escapeHtml(e.id)}">Edit</button><button class="dm-remove" data-dmremove="${escapeHtml(e.id)}">Remove</button></span></div>
       <p class="dm-entry-decision${empty ? ' dm-entry-empty' : ''}" dir="auto">${e.decision ? escapeHtml(e.decision) : 'No ruling yet — click Edit to add one. Until then this term is not sent to the chatbot.'}</p>
+      ${suggestionHtml}
     </div>`;
   }).join('');
+  renderDmSuggestPrompt();
 }
+
+// ---- Decision Memory ruling suggestions ---------------------------------------
+// Same "AI proposes, human decides" gate as everywhere else in the app: a suggested ruling
+// never becomes an active Decision Memory entry by itself. It sits next to the term, editable
+// as plain text (Accept just copies it into `decision`), until the editor explicitly accepts
+// or rejects it.
+function dmTermsNeedingSuggestion(){
+  return (doc.decisionMemory || []).filter(e => !e.decision && !e.suggestion);
+}
+function renderDmSuggestPrompt(){
+  const out = $('dmSuggestPromptOut');
+  if(!out) return;
+  const terms = dmTermsNeedingSuggestion();
+  if(!terms.length){ out.value = ''; out.placeholder = 'No terms without a ruling right now.'; return; }
+  const bp = doc?.bookProfile;
+  const context = bp?.status === 'approved' && bp.fields
+    ? BOOK_PROFILE_FIELDS.filter(f => bp.fields[f.key]).map(f => `${f.label}: ${bp.fields[f.key]}`).join('\n')
+    : '(No approved Book Profile yet — suggest based on the term itself.)';
+  out.value = `YOU ARE: An editorial assistant proposing terminology rulings for a translation project, based on context already gathered about this book. You are NOT deciding anything — a human editor will accept or reject each suggestion.
+
+BOOK CONTEXT:
+${context}
+
+For EACH term below, propose ONE short, concrete ruling: how it should be handled in translation (e.g. keep untranslated, translate as X, treat as a proper noun, etc.), in one sentence. If you have no confident basis for a term, say so plainly rather than guessing.
+
+TERMS:
+${terms.map(t => `- ${t.term}`).join('\n')}
+
+Return EXACTLY this format, once per term, in the same order:
+[TERM: <term>]
+<one-sentence ruling>
+`;
+}
+$('dmCopySuggestBtn')?.addEventListener('click', () => copyWithFeedback($('dmSuggestPromptOut'), $('dmCopySuggestBtn')));
+$('dmProcessSuggestBtn')?.addEventListener('click', () => {
+  const raw = $('dmSuggestPasteIn').value.trim();
+  $('dmSuggestError').textContent = '';
+  if(!raw){ $('dmSuggestError').textContent = "Paste the chatbot's suggestions first."; return; }
+  const blocks = [...raw.matchAll(/\[TERM:\s*([^\]]+)\]\s*([\s\S]*?)(?=\[TERM:|$)/g)];
+  if(!blocks.length){ $('dmSuggestError').textContent = 'No [TERM: ...] markers found. Make sure the chatbot kept the requested format.'; return; }
+  let matched = 0;
+  blocks.forEach(([, term, text]) => {
+    const entry = doc.decisionMemory.find(e => e.term.toLowerCase() === term.trim().toLowerCase());
+    if(entry && !entry.decision){ entry.suggestion = text.trim(); matched++; }
+  });
+  if(!matched){ $('dmSuggestError').textContent = "Terms in the reply didn't match any term still waiting for a ruling."; return; }
+  $('dmSuggestPasteIn').value = '';
+  save(); renderDecisionMemory();
+});
+$('dmList').addEventListener('click', e => {
+  const acceptBtn = e.target.closest('button[data-dmacceptsuggest]');
+  const rejectBtn = e.target.closest('button[data-dmrejectsuggest]');
+  if(acceptBtn){
+    const entry = doc.decisionMemory.find(x => x.id === acceptBtn.dataset.dmacceptsuggest);
+    if(entry){ entry.decision = entry.suggestion; entry.suggestion = null; }
+    save(); renderDecisionMemory(); renderPrompt();
+    return;
+  }
+  if(rejectBtn){
+    const entry = doc.decisionMemory.find(x => x.id === rejectBtn.dataset.dmrejectsuggest);
+    if(entry) entry.suggestion = null;
+    save(); renderDecisionMemory();
+    return;
+  }
+});
 
 $('dmAddBtn').onclick = () => {
   const term = $('dmTermInput').value.trim();
