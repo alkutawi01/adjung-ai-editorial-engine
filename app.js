@@ -1424,7 +1424,8 @@ function renderAll(){
     // tracking the FINAL count closely — naming the actual number on the button itself is what
     // stops a 1-of-19 export from being mistaken for the whole book.
     const finalCount = doc.units.filter(u => u.final).length;
-    $('exportDocBtn').textContent = `⬇ Export ${finalCount} FINAL unit${finalCount === 1 ? '' : 's'} (.doc)`;
+    $('exportDocBtn').textContent = `⬇ Export ${finalCount} FINAL unit${finalCount === 1 ? '' : 's'} (.docx)`;
+    $('exportComparisonBtn').textContent = `⬇ Export ${finalCount} FINAL unit${finalCount === 1 ? '' : 's'}, comparison (.docx)`;
     $('exportBtn').textContent = `⬇ Export ${finalCount} FINAL unit${finalCount === 1 ? '' : 's'} (.json)`;
   }
 
@@ -1792,47 +1793,12 @@ $('exportBtn').onclick = () => {
   }, `${doc.fileName.replace(/\.docx$/i, '')}-final.json`);
 };
 
-// Builds a Word-openable .doc file entirely client-side, no external library or network call:
-// Word reads HTML wrapped in its own XML namespace just as reliably as a real .docx. This keeps
-// the export self-contained and offline, matching how the rest of the app already works.
-function buildReadableWordDoc(finalUnits, titleLine, subtitleLine){
-  const byChapter = new Map();
-  finalUnits.forEach(u => {
-    if(!byChapter.has(u.chapter)) byChapter.set(u.chapter, []);
-    byChapter.get(u.chapter).push(u);
-  });
-
-  // A unit flagged sceneBreakAfter had its own "***" line stripped out at upload time (folded
-  // into a UI marker instead) — the export was never told to put anything back in its place, so
-  // a real scene/time-jump in the manuscript silently became a seamless paragraph run in the
-  // exported .doc. Same marker convention as the source, centered like a real scene break.
-  const chapterHtml = [...byChapter.entries()].map(([chapter, units]) => {
-    const body = units.map((u, i) => {
-      const text = (u.translation.text || '').trim();
-      if(!text) return '';
-      const paras = text.split(/\n\s*\n/).map(p => {
-        const clean = escapeHtml(p.replace(/\n/g, ' ').trim());
-        return clean ? `<p style="margin:0 0 12pt 0;text-indent:24pt;text-align:justify;">${clean}</p>` : '';
-      }).join('');
-      const isLast = i === units.length - 1;
-      const breakHtml = (u.sceneBreakAfter && !isLast) ? `<p style="margin:6pt 0 18pt;text-align:center;">* * *</p>` : '';
-      return paras + breakHtml;
-    }).join('');
-    return `<h1 style="font-size:16pt;margin:24pt 0 18pt 0;">${escapeHtml(chapter)}</h1>${body}`;
-  }).join('<br clear="all" style="page-break-before:always">');
-
-  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="utf-8"><title>${escapeHtml(titleLine)}</title>
-<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
-<style>body{font-family:Calibri,Georgia,serif;font-size:12pt;line-height:1.5;} h1{font-family:Calibri,Arial,sans-serif;}</style>
-</head>
-<body>
-<div style="text-align:center;margin-bottom:48pt;">
-  <h1 style="font-size:26pt;margin-bottom:6pt;">${escapeHtml(titleLine)}</h1>
-  <p style="font-style:italic;color:#555;">${escapeHtml(subtitleLine)}</p>
-</div>
-${chapterHtml}
-</body></html>`;
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 }
 
 $('exportDocBtn').onclick = () => {
@@ -1845,14 +1811,17 @@ $('exportDocBtn').onclick = () => {
   }
   const titleLine = doc.fileName.replace(/\.docx$/i, '');
   const subtitleLine = `${doc.targetLang || 'Translation'} — exported ${new Date().toLocaleDateString()}`;
-  const html = buildReadableWordDoc(finalUnits, titleLine, subtitleLine);
-  const blob = new Blob(['﻿', html], { type: 'application/msword' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `${titleLine} - ${doc.targetLang || 'Translation'}.doc`;
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
+  downloadBlob(buildReadableDocx(finalUnits, titleLine, subtitleLine), `${titleLine} - ${doc.targetLang || 'Translation'}.docx`);
   $('exportDocMsg').textContent = `✓ Document downloaded (${finalUnits.length} unit(s)).`;
+  setTimeout(() => { $('exportDocMsg').textContent = ''; }, 4000);
+};
+
+$('exportComparisonBtn').onclick = () => {
+  const finalUnits = (doc?.units || []).filter(u => u.final).sort((a, b) => a.id.localeCompare(b.id));
+  if(!finalUnits.length){ $('exportDocMsg').textContent = 'No FINAL units to export yet.'; return; }
+  const titleLine = doc.fileName.replace(/\.docx$/i, '');
+  downloadBlob(buildComparisonDocx(finalUnits, titleLine), `${titleLine} - Editorial Comparison.docx`);
+  $('exportDocMsg').textContent = `✓ Comparison document downloaded (${finalUnits.length} unit(s)).`;
   setTimeout(() => { $('exportDocMsg').textContent = ''; }, 4000);
 };
 

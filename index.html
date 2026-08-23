@@ -220,8 +220,10 @@
           <div class="sidebar-section">
             <h2>Export</h2>
             <p class="hint-small">Only units you marked FINAL are included.</p>
-            <button class="primary-button" id="exportDocBtn">⬇ Export readable document (.doc)</button>
+            <button class="primary-button" id="exportDocBtn">⬇ Export readable manuscript (.docx)</button>
+            <button class="primary-button" id="exportComparisonBtn">⬇ Export editorial comparison (.docx)</button>
             <button class="copy-button" id="exportBtn">⬇ Export FINAL units (.json)</button>
+            <p class="hint-small">"Editorial comparison" lays out Original, Translation, Back Translation and notes side by side per unit — for a proofreader or second editor, not for publishing.</p>
             <p id="exportDocMsg" class="parse-success" role="status"></p>
           </div>
         </div>
@@ -252,5 +254,6 @@
   </div>
 </div>
 <script src="./docx-reader.js"></script>
+<script src="./docx-writer.js"></script>
 <script src="./app.js"></script>
 </body></html>
