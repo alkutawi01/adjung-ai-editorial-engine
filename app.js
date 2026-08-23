@@ -840,6 +840,50 @@ function bidiSafeParagraphs(text){
   ).join('');
 }
 
+// Advisory only — flags a handful of mechanically-checkable things a fast read can miss (a
+// dropped number, an empty field, a term that had a ruling but doesn't turn up anywhere in the
+// output). None of this is asserted as definitely wrong; it's phrased as "worth checking" because
+// a heuristic like this WILL have false positives (a number spelled out as a word, a term that
+// was correctly translated to something else per its own ruling) — the editor is still the one
+// who decides, this just points at places worth a second look before Mark FINAL.
+function computeFinalWarnings(u){
+  const warnings = [];
+  const transText = u.translation.text || '';
+  const backText = u.backTranslation.text || '';
+  if(!transText.trim()) warnings.push('Translation is empty.');
+  if(!backText.trim()) warnings.push('Back Translation is empty.');
+  if(transText.trim()){
+    const origNums = [...new Set((u.source.match(/\d+/g) || []))];
+    const missingNums = origNums.filter(n => !transText.includes(n));
+    if(missingNums.length) warnings.push(`Number(s) in the original may be missing from the Translation: ${missingNums.join(', ')}.`);
+    const relevantTerms = relevantDecisionMemory(u.source);
+    relevantTerms.forEach(e => {
+      if(!termAppearsIn(transText, e.term) && !termAppearsIn(backText, e.term)){
+        warnings.push(`Decision Memory term "${e.term}" (ruling: "${e.decision}") is in the original but doesn't turn up in the Translation or Back Translation — worth checking it was applied.`);
+      }
+    });
+  }
+  return warnings;
+}
+
+const FINAL_CHECKLIST_ITEMS = [
+  { key: 'meaning', label: 'Meaning retained' },
+  { key: 'terms', label: 'Names and terms consistent' },
+  { key: 'dialogue', label: 'Dialogue / person / tense retained' },
+  { key: 'complete', label: 'No missing sentence or paragraph' },
+  { key: 'backTranslationChecked', label: 'Back Translation checked' }
+];
+let checklistShownIds = new Set();
+function renderFinalChecklist(u){
+  const shown = checklistShownIds.has(u.id);
+  const checklist = u.finalChecklist || {};
+  const doneCount = FINAL_CHECKLIST_ITEMS.filter(i => checklist[i.key]).length;
+  const toggle = `<button class="text-button" data-togglechecklist="${escapeHtml(u.id)}">${shown ? '✕ Hide checklist' : `☑ Pre-FINAL checklist (${doneCount}/${FINAL_CHECKLIST_ITEMS.length})`}</button>`;
+  if(!shown) return toggle;
+  const items = FINAL_CHECKLIST_ITEMS.map(i => `<label class="checklist-item"><input type="checkbox" data-checklistitem="${escapeHtml(u.id)}|${i.key}" ${checklist[i.key] ? 'checked' : ''}> ${escapeHtml(i.label)}</label>`).join('');
+  return `${toggle}<div class="final-checklist">${items}</div>`;
+}
+
 function fieldBlock(label, text, cls, kind){
   if(!text) return '';
   return `<div class="unit-field ${cls || ''} ${kind ? 'kind-' + kind : ''}"><small>${escapeHtml(label)}</small>${bidiSafeParagraphs(text)}</div>`;
@@ -974,7 +1018,9 @@ function renderUnitList(){
           ? `<p class="stale-banner">⚠ Back Translation is stale — it no longer matches the current Translation. <button class="text-button" data-gotobt="${escapeHtml(u.id)}">Go rerun it →</button></p>`
           : `${finalFieldBlock(u, 'backTranslation')}
              <button class="text-button" data-togglediff="${escapeHtml(u.id)}">${showingDiff ? '✕ Hide differences' : '🔍 Show differences (Original ↔ Back Translation)'}</button>
-             ${diffBlock}`}
+             ${diffBlock}
+             ${computeFinalWarnings(u).length ? `<div class="final-warning-banner">${computeFinalWarnings(u).map(w => `<p>⚠ ${escapeHtml(w)}</p>`).join('')}</div>` : ''}
+             ${renderFinalChecklist(u)}`}
         <div class="unit-actions final-actions-sticky">${isStale
           ? `<span class="hint-small">Rerun Back Translation before this unit can be marked FINAL again.</span>`
           : u.final
@@ -1470,6 +1516,17 @@ $('pilotConfirmBtn').onclick = () => { doc.pilotConfirmed = true; save(); render
 $('pilotRefineBtn').onclick = () => { pilotBannerDismissed = true; renderPilotBanner(); };
 $('selectNoneBtn').onclick = () => { selected.clear(); $('batchWarning').textContent = ''; $('promptOut').value = ''; renderUnitList(); renderPrompt(); renderSourceLangSuggest(); };
 $('unitList').addEventListener('change', e => {
+  const checklistCb = e.target.closest('input[data-checklistitem]');
+  if(checklistCb){
+    const [id, key] = checklistCb.dataset.checklistitem.split('|');
+    const u = doc.units.find(x => x.id === id);
+    if(u){
+      if(!u.finalChecklist) u.finalChecklist = {};
+      u.finalChecklist[key] = checklistCb.checked;
+      save(); renderUnitList();
+    }
+    return;
+  }
   const cb = e.target.closest('input[data-select]');
   if(!cb) return;
   $('batchWarning').textContent = '';
@@ -1518,6 +1575,13 @@ $('unitList').addEventListener('click', e => {
   if(toggleDiffBtn){
     const id = toggleDiffBtn.dataset.togglediff;
     if(diffShownIds.has(id)) diffShownIds.delete(id); else diffShownIds.add(id);
+    renderUnitList();
+    return;
+  }
+  const toggleChecklistBtn = t('togglechecklist');
+  if(toggleChecklistBtn){
+    const id = toggleChecklistBtn.dataset.togglechecklist;
+    if(checklistShownIds.has(id)) checklistShownIds.delete(id); else checklistShownIds.add(id);
     renderUnitList();
     return;
   }
