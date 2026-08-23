@@ -102,6 +102,7 @@
 
         <div class="phase-tools" id="toolsBatch" hidden>
           <p class="phase-intro" id="phaseIntro"></p>
+          <p id="backtranslationInfo" class="hint-small backtranslation-info" hidden></p>
           <div class="sidebar-section" id="sourceLangSection" hidden>
             <h2>Manuscript's source language <span class="required-mark">required</span></h2>
             <p class="hint-small">This is what the paraphrase prompt tells the chatbot to write in — a manuscript with more than one language can have this changed per batch.</p>
@@ -170,7 +171,8 @@
         </div>
 
         <div class="phase-tools" id="toolsFinal" hidden>
-          <p class="phase-intro">Read all four versions of a unit side by side. Mark it FINAL only when the meaning holds.</p>
+          <p class="phase-intro">Read all four versions of a unit side by side. Mark it FINAL only when the meaning holds. Editing a FINAL unit's text automatically unmarks it, so a change never sits in an exported file without being re-reviewed.</p>
+          <p id="finalEditNotice" class="parse-success" role="status"></p>
           <div class="sidebar-section">
             <h2>Export</h2>
             <p class="hint-small">Only units you marked FINAL are included.</p>

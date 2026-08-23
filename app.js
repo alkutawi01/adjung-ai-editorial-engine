@@ -1080,6 +1080,12 @@ function renderAll(){
     $('sourceLangSection').hidden = mode !== 'parafrasa';
     $('targetLangSection').hidden = mode !== 'translation';
     $('decisionMemorySection').hidden = mode === 'backtranslation';
+    // Back Translation intentionally has no source-language picker or Decision Memory of its
+    // own — it always mirrors into the language already set for Paraphrase, and a literal
+    // mirror-back isn't the place to apply terminology rulings. Without saying so, the missing
+    // panels read as something broken rather than something deliberate.
+    $('backtranslationInfo').hidden = mode !== 'backtranslation';
+    if(mode === 'backtranslation') $('backtranslationInfo').textContent = `Back-translating to: ${doc.sourceLang || '(source language not set)'} — Decision Memory is intentionally not used here; it mirrors the translation literally.`;
     $('sourceLangInput').value = doc.sourceLang || '';
     $('targetLangInput').value = doc.targetLang || '';
     $('targetLangInputScan').value = doc.targetLang || '';
@@ -1246,7 +1252,17 @@ $('unitList').addEventListener('click', e => {
     const [id, field] = saveFinalEditBtn.dataset.savefinaledit.split('|');
     const u = doc.units.find(x => x.id === id);
     const newText = $('editFinalTextarea').value.trim();
+    // A FINAL unit's text edited without touching FINAL status would let a post-approval change
+    // slip into an export having never been re-reviewed — the whole point of marking FINAL in
+    // the first place. Auto-unmarking is the simplest rule an editor can't accidentally defeat:
+    // any actual text change means the unit goes back to "not final" until reconfirmed.
+    const changed = u && newText && newText !== u[field].text;
     if(u && newText) u[field].text = newText;
+    if(changed && u.final){
+      u.final = false;
+      $('finalEditNotice').textContent = `${id} edited — automatically unmarked FINAL. Review and Mark FINAL again when ready.`;
+      setTimeout(() => { $('finalEditNotice').textContent = ''; }, 6000);
+    }
     editingFinalId = null; editingFinalField = null;
     save(); renderUnitList();
     return;
@@ -1478,13 +1494,14 @@ $('processBtn').onclick = () => {
     }
   }
 
-  let applied = 0, unknown = [];
+  let applied = 0, unknown = [], firstAppliedId = null;
   Object.entries(chunks).forEach(([id, chunk]) => {
     const u = doc.units.find(x => x.id === id);
     if(!u){ unknown.push(id); return; }
     const text = extractLabeled(chunk, fieldLabel);
     if(!text) return;
     u[targetField] = { text, notes: extractLabeled(chunk, 'NOTES'), status: 'pending' };
+    if(!firstAppliedId) firstAppliedId = id;
     applied++;
   });
   save();
@@ -1495,9 +1512,17 @@ $('processBtn').onclick = () => {
   $('statusFilter').value = 'pending';
   renderAll();
   const approveLabel = { parafrasa: 'Approve paraphrase', translation: 'Approve translation', backtranslation: 'Approve back translation' }[mode];
-  $('parseSuccess').textContent = `✓ ${applied} unit(s) saved. The list is filtered to "Awaiting review". Use "${approveLabel}" or "Reject" on each card.`
+  const fieldNoun = { parafrasa: 'paraphrase', translation: 'translation', backtranslation: 'back translation' }[mode];
+  $('parseSuccess').textContent = `✓ ${applied} ${fieldNoun}${applied === 1 ? '' : 's'} saved — now awaiting review. Use "${approveLabel}" or "Reject" on each card below.`
     + (unknown.length ? ` Ignored unknown id(s): ${unknown.join(', ')}.` : '');
   setTimeout(() => { $('parseSuccess').textContent = ''; }, 8000);
+  // Collapsing the accordion and re-filtering the list can leave the unit that was just saved
+  // scrolled out of view, which reads as the content having vanished rather than moved — scroll
+  // it back into frame so "saved" and "here it is" happen together.
+  if(firstAppliedId){
+    const card = [...document.querySelectorAll('.unit-card')].find(el => el.querySelector('b')?.textContent === firstAppliedId);
+    card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 };
 
 renderAll();
