@@ -274,7 +274,7 @@ function renderBookProfilePanel(){
   }).join('');
 
   if(bp.status === 'none'){
-    $('bookProfileFields').innerHTML = '<div class="empty-state">No Book Profile yet. Copy the prompt on the left, send it to your chatbot with the book file, then paste the reply.</div>';
+    $('bookProfileFields').innerHTML = '<div class="empty-state">No Translation Guide yet. Copy the prompt on the left, send it to your chatbot with the book file, then paste the reply.</div>';
     $('bookProfileActions').innerHTML = '';
     return;
   }
@@ -282,9 +282,13 @@ function renderBookProfilePanel(){
   const overCount = BOOK_PROFILE_FIELDS.filter(f => (bp.fields && bp.fields[f.key] || '').length > f.max).length;
   const validationLine = `<p class="bp-validation${filledCount < BOOK_PROFILE_FIELDS.length ? ' bp-validation-warn' : ''}">${filledCount}/${BOOK_PROFILE_FIELDS.length} fields complete${overCount ? ` · ${overCount} running long (not an error)` : ''}</p>`;
   $('bookProfileFields').innerHTML = validationLine + fieldsHtml;
-  $('bookProfileActions').innerHTML = bp.status === 'pending'
-    ? `<button class="reject-button" id="bpReject">Reject and redo</button><button class="approve-button" id="bpApprove">✓ Approve Book Profile &amp; Start Paraphrase</button>`
-    : `<button class="reject-button" id="bpReopen">Reopen for review</button>`;
+  // Export sits next to Reopen (not just in Backup) because a Translation Guide is meant to
+  // travel — the next book in the same series should be able to start from this one's voice,
+  // terminology and rulings without the editor retyping any of it.
+  const exportBtn = `<button class="text-button" id="bpExportGuide">⬇ Export Guide</button>`;
+  $('bookProfileActions').innerHTML = (bp.status === 'pending'
+    ? `<button class="reject-button" id="bpReject">Reject and redo</button><button class="approve-button" id="bpApprove">✓ Approve Translation Guide &amp; Start Paraphrase</button>`
+    : `<button class="reject-button" id="bpReopen">Reopen for review</button>`) + exportBtn;
   if($('bpApprove')) $('bpApprove').onclick = () => {
     doc.bookProfile.status = 'approved'; save(); renderAll(); setPhase('parafrasa');
   };
@@ -293,6 +297,13 @@ function renderBookProfilePanel(){
   };
   if($('bpReopen')) $('bpReopen').onclick = () => {
     doc.bookProfile.status = 'pending'; save(); renderAll();
+  };
+  if($('bpExportGuide')) $('bpExportGuide').onclick = () => {
+    downloadJson({
+      kind: 'adjung-translation-guide', exportedAt: new Date().toISOString(),
+      sourceBook: doc.fileName, sourceLang: doc.sourceLang, targetLang: doc.targetLang,
+      fields: bp.fields, decisionMemory: (doc.decisionMemory || []).filter(e => e.decision)
+    }, `${doc.fileName.replace(/\.docx$/i, '')} - Translation Guide.json`);
   };
   renderKeyTermsImport();
 }
@@ -325,10 +336,41 @@ function renderKeyTermsImport(){
 $('copyBookScanBtn').onclick = () => copyWithFeedback($('bookScanPromptOut'), $('copyBookScanBtn'));
 $('bpReopenFromBar').onclick = () => { doc.bookProfile.status = 'pending'; save(); renderAll(); };
 
+// Importing a Guide from an earlier book in the same series pre-fills this book's fields and
+// terminology, but deliberately lands as 'pending', not 'approved' — a Guide written for a
+// different manuscript still needs a human to confirm it actually fits this one before Paraphrase
+// can start. Decision Memory entries merge in (skipping terms already present) rather than
+// replacing, so anything already ruled on for this specific book is never silently overwritten.
+$('guideImportBtn').onclick = () => $('guideImportInput').click();
+$('guideImportInput').onchange = async (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const parsed = JSON.parse(await file.text());
+    if(!parsed || !parsed.fields) throw new Error('Not an Adjung Translation Guide file.');
+    doc.bookProfile = { fields: parsed.fields, status: 'pending' };
+    if(!doc.decisionMemory) doc.decisionMemory = [];
+    const existing = new Set(doc.decisionMemory.map(e => e.term.toLowerCase()));
+    let added = 0;
+    (parsed.decisionMemory || []).forEach(e => {
+      if(!e.term || existing.has(e.term.toLowerCase())) return;
+      doc.decisionMemory.push({ id: `DM${Date.now().toString(36)}${Math.floor(Math.random()*1000)}`, term: e.term, decision: e.decision || '' });
+      existing.add(e.term.toLowerCase());
+      added++;
+    });
+    save();
+    renderAll();
+    $('guideImportMsg').textContent = `✓ Imported from "${parsed.sourceBook || file.name}" — review and approve below. ${added} Decision Memory ruling(s) carried over.`;
+  }catch(err){
+    $('guideImportMsg').textContent = 'Import failed: ' + err.message;
+  }
+  $('guideImportInput').value = '';
+};
+
 $('processBookProfileBtn').onclick = () => {
   const raw = $('bookProfilePasteIn').value.trim();
   $('bookProfileError').textContent = '';
-  if(!raw){ $('bookProfileError').textContent = "Paste the chatbot's Book Profile reply first."; return; }
+  if(!raw){ $('bookProfileError').textContent = "Paste the chatbot's Translation Guide reply first."; return; }
   const fields = parseBookProfileFields(raw);
   if(!Object.values(fields).some(v => v)){
     $('bookProfileError').textContent = 'No [GENRE], [PURPOSE] or other field tags found. Make sure the chatbot kept the requested format.';
@@ -413,7 +455,7 @@ function renderDmSuggestPrompt(){
   const bp = doc?.bookProfile;
   const context = bp?.status === 'approved' && bp.fields
     ? BOOK_PROFILE_FIELDS.filter(f => bp.fields[f.key]).map(f => `${f.label}: ${bp.fields[f.key]}`).join('\n')
-    : '(No approved Book Profile yet — suggest based on the term itself.)';
+    : '(No approved Translation Guide yet — suggest based on the term itself.)';
   out.value = `YOU ARE: An editorial assistant proposing terminology rulings for a translation project, based on context already gathered about this book. You are NOT deciding anything — a human editor will accept or reject each suggestion.
 
 BOOK CONTEXT:
@@ -522,7 +564,7 @@ function relevantDecisionMemory(text){
 
 // ---- Phases ------------------------------------------------------------------
 const PHASES = {
-  scan: { label: 'Book Scan', panelTitle: 'Book Profile' },
+  scan: { label: 'Book Scan', panelTitle: 'Translation Guide' },
   parafrasa: {
     label: 'Paraphrase', panelTitle: 'Paraphrase units', field: 'parafrasa',
     intro: 'Restate each unit in its own source language so meaning is confirmed before any translation begins.',
@@ -569,7 +611,7 @@ function bookProfileReady(){ return doc?.bookProfile?.status === 'approved'; }
 function phaseLocked(name){
   const cfg = PHASES[name];
   if(cfg.gate && !anyApproved(cfg.gate)) return `Needs at least one approved ${PHASES[Object.keys(PHASES).find(k => PHASES[k].field === cfg.gate)]?.label.toLowerCase() || cfg.gate}`;
-  if(cfg.needsBookProfile && !bookProfileReady()) return 'Needs an approved Book Profile';
+  if(cfg.needsBookProfile && !bookProfileReady()) return 'Needs an approved Translation Guide';
   return null;
 }
 
@@ -609,7 +651,7 @@ function unlockSentence(name){
     const gatePhase = Object.values(PHASES).find(p => p.field === cfg.gate);
     return `${cfg.label} unlocks after at least one ${gatePhase.label.toLowerCase()} is approved.`;
   }
-  if(cfg.needsBookProfile && !bookProfileReady()) return `${cfg.label} unlocks after the Book Profile is approved.`;
+  if(cfg.needsBookProfile && !bookProfileReady()) return `${cfg.label} unlocks after the Translation Guide is approved.`;
   return '';
 }
 function unlockImperative(name){
@@ -618,7 +660,7 @@ function unlockImperative(name){
     const gatePhase = Object.values(PHASES).find(p => p.field === cfg.gate);
     return `approve a ${gatePhase.label.toLowerCase()}`;
   }
-  if(cfg.needsBookProfile && !bookProfileReady()) return 'approve the Book Profile';
+  if(cfg.needsBookProfile && !bookProfileReady()) return 'approve the Translation Guide';
   return '';
 }
 const PHASE_ORDER = ['parafrasa', 'translation', 'backtranslation', 'final'];
@@ -1150,7 +1192,7 @@ function renderPromptSummary(promptText, sel){
   box.hidden = false;
   box.innerHTML = `~${estimateTokens(promptText).toLocaleString()} tokens · ${sel.length} unit(s)`
     + (mode === 'backtranslation' ? '' : ` · Decision Memory applied: ${relevant.length ? relevant.map(e => escapeHtml(e.term)).join(', ') : 'none'}`)
-    + (bpIncluded ? ` · <button class="summary-toggle" id="promptSummaryBpToggle">Book Profile included ▾</button>` : '');
+    + (bpIncluded ? ` · <button class="summary-toggle" id="promptSummaryBpToggle">Translation Guide included ▾</button>` : '');
   if(bpIncluded){
     $('promptSummaryBpToggle').onclick = () => {
       let preview = box.querySelector('.prompt-summary-preview');

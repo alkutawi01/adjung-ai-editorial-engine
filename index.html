@@ -29,7 +29,7 @@
       <div class="whats-next">
         <p class="whats-next-title">What happens next</p>
         <ol>
-          <li>Chatbot reads the whole book once and writes a Book Profile (voice, genre, key terms)</li>
+          <li>Chatbot reads the whole book once and writes a Translation Guide (voice, genre, key terms)</li>
           <li>Paraphrase each unit, side by side with the original, for you to approve or edit</li>
           <li>Translate into your target language, same approve/edit review</li>
           <li>Back-translate to literally mirror the translation, so drift is easy to catch</li>
@@ -75,10 +75,17 @@
 
         <div class="phase-tools" id="toolsScan">
           <div class="sidebar-section" id="bookScanCompleteBar" hidden>
-            <p class="scan-complete-bar">✓ Book Profile complete <button class="text-button" id="bpReopenFromBar">Reopen for review</button></p>
+            <p class="scan-complete-bar">✓ Translation Guide complete <button class="text-button" id="bpReopenFromBar">Reopen for review</button></p>
           </div>
           <div id="bookScanSteps">
-            <p class="phase-intro">Send the whole book to your chatbot once, so it can describe the voice, style and risky terms before any unit work begins.</p>
+            <p class="phase-intro">Send the whole book to your chatbot once, so it can describe the voice, style and risky terms before any unit work begins. This becomes the book's <b>Translation Guide</b> — approved once, then referenced automatically by every later phase.</p>
+            <div class="sidebar-section" id="translationGuideImport">
+              <h2>Reuse a Translation Guide</h2>
+              <p class="hint-small">Starting the next book in a series? Import a Guide exported from an earlier book to carry over its voice, terminology, and rulings — you'll still review and approve it before it applies here.</p>
+              <input type="file" id="guideImportInput" accept=".json" hidden>
+              <button class="text-button" id="guideImportBtn">Import Translation Guide…</button>
+              <p id="guideImportMsg" class="hint-small backup-status"></p>
+            </div>
             <div class="sidebar-section" id="targetLangScanSection">
               <h2>Target language</h2>
               <p class="hint-small">Set this now if you already know it — it carries through to the Translation phase and can still be changed later.</p>
@@ -93,8 +100,8 @@
             </div>
             <div class="sidebar-section">
               <h2>Step B · Paste the reply</h2>
-              <textarea id="bookProfilePasteIn" class="paste-in" placeholder="Paste the chatbot's Book Profile here…"></textarea>
-              <button class="primary-button" id="processBookProfileBtn">Process Book Profile →</button>
+              <textarea id="bookProfilePasteIn" class="paste-in" placeholder="Paste the chatbot's Translation Guide here…"></textarea>
+              <button class="primary-button" id="processBookProfileBtn">Process Translation Guide →</button>
               <p id="bookProfileError" class="upload-error" role="alert"></p>
             </div>
           </div>
@@ -115,7 +122,7 @@
           </div>
           <details class="sidebar-section step-section" id="decisionMemorySection">
             <summary><span class="chevron" aria-hidden="true">▸</span><h2>Decision Memory <span id="dmCount" class="unit-status none">0</span></h2><p id="dmSummaryLine" class="hint-small dm-summary-line"></p></summary>
-            <p class="hint-small">Approved rulings on terms and style — names, religious terms, transliteration, house style. Only entries whose term appears in the selected units are added to the prompt.</p>
+            <p class="hint-small">The terminology half of this book's Translation Guide — names, religious terms, transliteration, house style. Only entries whose term appears in the selected units are added to the prompt. Included when you export the Guide from Book Scan.</p>
             <div class="dm-add-row">
               <input type="text" id="dmTermInput" placeholder="Term (e.g. tawaqquf)">
               <textarea id="dmDecisionInput" class="dm-decision-input" placeholder="Ruling (e.g. keep the Arabic term, never translate it)" rows="2"></textarea>
@@ -124,7 +131,7 @@
             <div id="dmList" class="dm-list"></div>
             <details class="step-section dm-suggest-section" id="dmSuggestSection">
               <summary><span class="chevron" aria-hidden="true">▸</span><h2>Suggest rulings via chatbot</h2></summary>
-              <p class="hint-small">For terms with no ruling yet, ask a chatbot to propose one from the Book Profile context — you still Accept or Reject each suggestion.</p>
+              <p class="hint-small">For terms with no ruling yet, ask a chatbot to propose one from the Translation Guide context — you still Accept or Reject each suggestion.</p>
               <textarea id="dmSuggestPromptOut" class="prompt-out dm-suggest-prompt" readonly></textarea>
               <button class="copy-button" id="dmCopySuggestBtn">▣ Copy prompt</button>
               <textarea id="dmSuggestPasteIn" class="paste-in" placeholder="Paste the chatbot's suggestions here…"></textarea>
