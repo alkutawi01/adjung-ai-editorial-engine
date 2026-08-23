@@ -2003,4 +2003,8 @@ $('processBtn').onclick = () => {
   }
 };
 
+// Computed from the real clock, not a hardcoded string — the year is always correct on whatever
+// day the page happens to load, with nothing to remember to bump every January.
+$('copyrightNotice').textContent = `© ${new Date().getFullYear()} Adjung Press`;
+
 renderAll();
