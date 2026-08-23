@@ -94,6 +94,12 @@ function save(){
 const UNIT_TARGET_MIN = 220;
 const UNIT_TARGET_MAX = 650;
 
+// A standalone line of asterisks/dashes/etc. between paragraphs is a scene break in prose —
+// worth flagging in the unit list (not auto-merging: that's an editorial call) so the editor
+// notices "U0018 ends mid-scene, U0019 starts a new one" before selecting a batch that
+// straddles it without meaning to.
+const SCENE_BREAK_RE = /^[\s*×✦⁂—–\-•·#~]{2,}$/;
+
 // Footnotes were extracted from the .docx (footnoteDb, per-paragraph footnoteIds) but nothing
 // downstream ever read them — no prompt, no UI panel, no export used this data. A manuscript
 // with real footnotes (common in academic/religious texts) silently lost them between upload
@@ -114,7 +120,7 @@ function buildUnitsFromParagraphs(paragraphs, footnoteDb){
     const body = paragraphs.slice(sec.start, sec.end).filter(p => p.style !== 'Heading1' && p.style !== 'TOC1');
     let bucket = [];
     let bucketLen = 0;
-    const flush = () => {
+    const flush = (sceneBreakAfter) => {
       if(!bucket.length) return;
       counter++;
       const footnoteIds = [...new Set(bucket.flatMap(p => p.footnoteIds))];
@@ -124,11 +130,15 @@ function buildUnitsFromParagraphs(paragraphs, footnoteDb){
         chapter: sec.title,
         source: bucket.map(p => p.text).join('\n\n') + (footnoteLines ? `\n\n${footnoteLines}` : ''),
         parafrasa: blankWork(), translation: blankWork(), backTranslation: blankWork(),
-        final: false
+        final: false, sceneBreakAfter: !!sceneBreakAfter
       });
       bucket = []; bucketLen = 0;
     };
     body.forEach(p => {
+      // A standalone break-marker line (***, —, etc.) is a real editorial boundary, not manuscript
+      // prose — close whatever's accumulated so far right here rather than folding the marker
+      // into either neighboring unit's body text.
+      if(SCENE_BREAK_RE.test(p.text.trim())){ flush(true); return; }
       // Already over target and this paragraph would push it further: close first, unless the
       // bucket is still under the minimum (a short dialogue line shouldn't stand alone).
       if(bucketLen >= UNIT_TARGET_MIN && bucketLen + p.text.length > UNIT_TARGET_MAX) flush();
@@ -349,6 +359,11 @@ let editingDmId = null;
 function renderDecisionMemory(){
   if(!doc.decisionMemory) doc.decisionMemory = [];
   $('dmCount').textContent = String(doc.decisionMemory.length);
+  const withRuling = doc.decisionMemory.filter(e => e.decision).length;
+  const empty = doc.decisionMemory.length - withRuling;
+  $('dmSummaryLine').textContent = !doc.decisionMemory.length
+    ? '0 rulings — add or review before processing, especially names and religious/technical terms.'
+    : empty ? `${withRuling} ruling(s) saved · ${empty} term(s) still need a ruling` : `${withRuling} ruling(s) saved`;
   const list = $('dmList');
   if(!doc.decisionMemory.length){ list.innerHTML = '<p class="dm-empty">No rulings saved yet.</p>'; return; }
   list.innerHTML = doc.decisionMemory.map(e => {
@@ -727,6 +742,7 @@ function renderUnitList(){
           ? `<button class="reject-button" data-unfinal="${escapeHtml(u.id)}">Unmark FINAL</button>`
           : `<button class="approve-button" data-final="${escapeHtml(u.id)}">✓ Mark FINAL</button>`}</div>
       </div>`;
+      if(u.sceneBreakAfter) html += `<div class="scene-break-marker">✦ scene break ✦</div>`;
       return;
     }
 
@@ -756,6 +772,7 @@ function renderUnitList(){
            ${w.status === 'approved' ? `<div class="unit-actions"><button class="reject-button" data-reject="${escapeHtml(u.id)}">Reopen for review</button><button class="text-button edit-button" data-edit="${escapeHtml(u.id)}">✎ Edit</button></div>` : ''}`
       }
     </div>`;
+    if(u.sceneBreakAfter) html += `<div class="scene-break-marker">✦ scene break ✦</div>`;
   });
   list.innerHTML = html;
 }
@@ -882,6 +899,23 @@ Return EXACTLY this format, once per unit, in the same order, using the same [UN
 `;
 }
 
+// A rough, honest estimate (not a real tokenizer) — good enough to tell an editor "this prompt
+// is small" vs "this prompt is huge" before they copy a wall of text they can't skim.
+function estimateTokens(text){ return Math.round((text || '').length / 4); }
+
+function renderPromptSummary(promptText, sel){
+  const box = $('promptSummary');
+  if(!promptText || !sel.length){ box.hidden = true; return; }
+  const relTexts = mode === 'parafrasa' ? sel.map(u => u.source)
+    : mode === 'translation' ? sel.map(u => u.source + '\n' + u.parafrasa.text)
+    : sel.map(u => u.translation.text);
+  const relevant = mode === 'backtranslation' ? [] : relevantDecisionMemory(relTexts.join('\n'));
+  box.hidden = false;
+  box.innerHTML = `~${estimateTokens(promptText).toLocaleString()} tokens · ${sel.length} unit(s)`
+    + (mode === 'backtranslation' ? '' : ` · Decision Memory applied: ${relevant.length ? relevant.map(e => escapeHtml(e.term)).join(', ') : 'none'}`)
+    + (bookProfileReady() ? ' · Book Profile included' : '');
+}
+
 function renderPrompt(){
   if(!BATCH_PHASES.includes(phase)) return;
   const sel = (doc?.units || []).filter(u => selected.has(u.id));
@@ -890,18 +924,22 @@ function renderPrompt(){
   // Marking a batch "sent" clears the selection, but blanking the prompt with it would strand an
   // editor whose clipboard copy failed or who needs to paste it a second time. The last prompt
   // stays on screen until a new selection replaces it.
-  if(!sel.length) return;
+  if(!sel.length){ $('promptSummary').hidden = true; return; }
   if(mode === 'parafrasa' && !(doc?.sourceLang || '').trim()){
     $('promptOut').value = "Fill in the manuscript's source language above before a paraphrase prompt can be built.";
+    $('promptSummary').hidden = true;
     return;
   }
   if(mode === 'translation' && !(doc?.targetLang || '').trim()){
     $('promptOut').value = 'Fill in the target language above before a translation prompt can be built.';
+    $('promptSummary').hidden = true;
     return;
   }
-  $('promptOut').value = mode === 'parafrasa' ? renderPromptParafrasa(sel)
+  const promptText = mode === 'parafrasa' ? renderPromptParafrasa(sel)
     : mode === 'translation' ? renderPromptTranslation(sel)
     : renderPromptBackTranslation(sel);
+  $('promptOut').value = promptText;
+  renderPromptSummary(promptText, sel);
 }
 
 // ---- Master render -----------------------------------------------------------
@@ -922,6 +960,7 @@ function renderAll(){
 
   if(phase === 'scan'){
     $('bookScanPromptOut').value = bookScanPromptText();
+    $('targetLangInputScan').value = doc.targetLang || '';
     renderBookProfilePanel();
   }
   if(BATCH_PHASES.includes(phase)){
@@ -931,8 +970,10 @@ function renderAll(){
     $('decisionMemorySection').hidden = mode === 'backtranslation';
     $('sourceLangInput').value = doc.sourceLang || '';
     $('targetLangInput').value = doc.targetLang || '';
+    $('targetLangInputScan').value = doc.targetLang || '';
     renderStatusFilterOptions();
     renderDecisionMemory();
+    renderSourceLangSuggest();
   }
 
   renderPhaseNav();
@@ -950,8 +991,50 @@ $('chapterFilter').onchange = () => { singleCardIndex = 0; renderUnitList(); };
 $('singleCardToggle').onchange = () => { singleCardMode = $('singleCardToggle').checked; singleCardIndex = 0; renderUnitList(); };
 $('singleCardPrev').onclick = () => { singleCardIndex--; renderUnitList(); };
 $('singleCardNext').onclick = () => { singleCardIndex++; renderUnitList(); };
-$('targetLangInput').oninput = () => { if(doc){ doc.targetLang = $('targetLangInput').value; save(); renderPrompt(); } };
-$('sourceLangInput').oninput = () => { if(doc){ doc.sourceLang = $('sourceLangInput').value; save(); renderPrompt(); } };
+$('targetLangInput').oninput = () => { if(doc){ doc.targetLang = $('targetLangInput').value; save(); $('targetLangInputScan').value = doc.targetLang; renderPrompt(); } };
+$('targetLangInputScan').oninput = () => { if(doc){ doc.targetLang = $('targetLangInputScan').value; save(); $('targetLangInput').value = doc.targetLang; } };
+$('sourceLangInput').oninput = () => { if(doc){ doc.sourceLang = $('sourceLangInput').value; save(); renderSourceLangSuggest(); renderPrompt(); } };
+
+// A free-text source language field trusts whatever the editor typed, with nothing to catch a
+// mismatch (e.g. field says "Malay" but a manuscript mixes in English chapters) until it shows
+// up as a garbled paraphrase several steps later. This is a lightweight in-browser heuristic —
+// not real language detection — that only ever SUGGESTS from the actual text of the units about
+// to be sent, so the editor can catch an obviously wrong setting before copying the prompt. It
+// never overwrites the field on its own.
+// Malay and Indonesian share almost their entire stopword list, so trying to tell them apart
+// from ~20 common words is false precision that would flip on a single word and confuse more
+// than it helps — one "Malay" bucket for both is the honest level of confidence this gives.
+const LANG_MARKERS = [
+  { lang: 'Arabic', test: t => /[؀-ۿ]/.test(t) },
+  { lang: 'Malay', words: ['yang','dan','ini','itu','saya','tidak','ada','dengan','untuk','tak','dia','kami','kita','pada','dari','akan','sudah','juga','boleh','bisa','nggak'] },
+  { lang: 'English', words: ['the','and','of','to','is','was','in','that','it','with','for','as','on','are','this','his','her'] }
+];
+function detectLanguage(text){
+  if(!text) return null;
+  const arabic = LANG_MARKERS[0];
+  if(arabic.test(text)) return 'Arabic';
+  const lower = ' ' + text.toLowerCase().replace(/[^\p{L}\s]/gu, ' ') + ' ';
+  let best = null, bestScore = 0;
+  LANG_MARKERS.slice(1).forEach(m => {
+    const score = m.words.reduce((n, w) => n + (lower.includes(` ${w} `) ? 1 : 0), 0);
+    if(score > bestScore){ bestScore = score; best = m.lang; }
+  });
+  return bestScore >= 2 ? best : null;
+}
+function renderSourceLangSuggest(){
+  const box = $('sourceLangSuggest');
+  if(!box || !doc) return;
+  const sample = (doc.units || []).filter(u => selected.has(u.id)).slice(0, 3);
+  const units = sample.length ? sample : (doc.units || []).slice(0, 3);
+  const detected = detectLanguage(units.map(u => u.source).join(' '));
+  const current = (doc.sourceLang || '').trim();
+  if(!detected || detected.toLowerCase() === current.toLowerCase()){ box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = `Detected from ${sample.length ? 'the selected units' : "this book's opening"}: <b>${escapeHtml(detected)}</b>. <button id="applyLangSuggest">Use this</button>`;
+  $('applyLangSuggest').onclick = () => {
+    doc.sourceLang = detected; $('sourceLangInput').value = detected; save(); box.hidden = true; renderPrompt();
+  };
+}
 // Fills up to the cap and stops rather than overshooting — the remaining filtered units are left
 // unchecked so the editor can just run "Select all filtered" again for the next batch.
 $('selectAllBtn').onclick = () => {
@@ -968,9 +1051,29 @@ $('selectAllBtn').onclick = () => {
     stats.chars += u.source.length; stats.sentences += sentences;
   }
   if(skipped) $('batchWarning').textContent = `Batch limit reached (${BATCH_MAX_CHARS} chars / ${BATCH_MAX_SENTENCES} sentences) — ${skipped} unit(s) left unselected. Process this batch, then select more.`;
-  renderUnitList(); renderPrompt();
+  renderUnitList(); renderPrompt(); renderSourceLangSuggest();
 };
-$('selectNoneBtn').onclick = () => { selected.clear(); $('batchWarning').textContent = ''; $('promptOut').value = ''; renderUnitList(); renderPrompt(); };
+// A smaller, round-trip-sized pick — "Select all filtered" deliberately fills to the hard cap,
+// which is more than a first-time editor needs for one comfortable review pass.
+const SUGGESTED_BATCH_UNITS = 5;
+$('suggestBatchBtn').onclick = () => {
+  $('batchWarning').textContent = '';
+  let stats = batchStatsFor((doc?.units || []).filter(u => selected.has(u.id)));
+  let picked = 0;
+  for(const u of filteredUnits()){
+    if(picked >= SUGGESTED_BATCH_UNITS) break;
+    const s = workField(u).status;
+    if(s !== 'none' && s !== 'rejected') continue;
+    if(selected.has(u.id)) continue;
+    const sentences = countSentences(u.source);
+    if(stats.chars + u.source.length > BATCH_MAX_CHARS || stats.sentences + sentences > BATCH_MAX_SENTENCES) break;
+    selected.add(u.id);
+    stats.chars += u.source.length; stats.sentences += sentences;
+    picked++;
+  }
+  renderUnitList(); renderPrompt(); renderSourceLangSuggest();
+};
+$('selectNoneBtn').onclick = () => { selected.clear(); $('batchWarning').textContent = ''; $('promptOut').value = ''; renderUnitList(); renderPrompt(); renderSourceLangSuggest(); };
 $('unitList').addEventListener('change', e => {
   const cb = e.target.closest('input[data-select]');
   if(!cb) return;
@@ -987,7 +1090,7 @@ $('unitList').addEventListener('change', e => {
   } else {
     selected.delete(cb.dataset.select);
   }
-  renderPrompt();
+  renderPrompt(); renderSourceLangSuggest();
 });
 $('unitList').addEventListener('click', e => {
   const t = sel => e.target.closest(`button[data-${sel}]`);
@@ -1185,6 +1288,23 @@ function parseBatchResponse(raw){
   return out;
 }
 
+// Live feedback the moment the reply lands, before "Process & Save" is even clicked — the old
+// flow only reported a malformed or partial reply after the click, forcing a fix-and-retry loop
+// that a glance at this line can avoid.
+$('pasteIn').addEventListener('input', () => {
+  const el = $('pasteInStatus');
+  const raw = $('pasteIn').value.trim();
+  if(!raw){ el.textContent = ''; el.className = 'hint-small paste-status'; return; }
+  const chunks = parseBatchResponse(raw);
+  const found = Object.keys(chunks).length;
+  const targetField = PHASES[mode].field;
+  const outstanding = doc.units.filter(u => u[targetField].status === 'sent').length;
+  if(!found){ el.textContent = '⚠ No [UNIT: id] markers detected yet.'; el.className = 'hint-small paste-status warn'; return; }
+  if(outstanding && found < outstanding){ el.textContent = `⚠ ${found} of ${outstanding} sent unit(s) detected — looks incomplete.`; el.className = 'hint-small paste-status warn'; return; }
+  el.textContent = `✓ ${found} unit(s) detected, format looks correct.`;
+  el.className = 'hint-small paste-status ok';
+});
+
 $('processBtn').onclick = () => {
   const raw = $('pasteIn').value.trim();
   $('parseError').textContent = '';
@@ -1223,6 +1343,7 @@ $('processBtn').onclick = () => {
   selected.clear();
   $('batchWarning').textContent = '';
   $('pasteIn').value = '';
+  $('pasteInStatus').textContent = '';
   $('statusFilter').value = 'pending';
   renderAll();
   const approveLabel = { parafrasa: 'Approve paraphrase', translation: 'Approve translation', backtranslation: 'Approve back translation' }[mode];
