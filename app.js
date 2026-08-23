@@ -802,6 +802,38 @@ function fieldBlock(label, text, cls, kind){
   return `<div class="unit-field ${cls || ''} ${kind ? 'kind-' + kind : ''}"><small>${escapeHtml(label)}</small>${bidiSafeParagraphs(text)}</div>`;
 }
 
+// A clarification an editor hasn't answered yet is, by design, indistinguishable from one they
+// answered "Ya" to unless the UI keeps them visually apart — that's the entire point of forcing
+// an explicit click instead of leaving a paragraph of prose to be silently skimmed past.
+let editingClarifyKey = null; // "unitId|field|qid", while its correction textarea is open
+function renderClarifications(unitId, field, clarifications){
+  if(!clarifications || !clarifications.length) return '';
+  return `<div class="clarify-list">${clarifications.map(c => {
+    const key = `${unitId}|${field}|${c.id}`;
+    if(editingClarifyKey === key){
+      return `<div class="clarify-card clarify-editing">
+        <p class="clarify-q">${escapeHtml(c.question)}</p>
+        <textarea class="edit-textarea" id="clarifyCorrectionInput" rows="2" placeholder="Pembetulan…">${escapeHtml(c.correctionText)}</textarea>
+        <div class="unit-actions"><button class="text-button" data-cancelclarify="1">Cancel</button><button class="approve-button" data-saveclarify="${escapeHtml(key)}">✓ Save</button></div>
+      </div>`;
+    }
+    const answeredHtml = c.answer === 'correction'
+      ? `<p class="clarify-answered">✎ Pembetulan: “${escapeHtml(c.correctionText)}”</p>`
+      : c.answer === 'yes' ? `<p class="clarify-answered">✓ Ya</p>`
+      : c.answer === 'no' ? `<p class="clarify-answered">✓ Tidak</p>`
+      : '';
+    return `<div class="clarify-card${c.answer ? ' clarify-answered-card' : ''}">
+      <p class="clarify-q">${escapeHtml(c.question)}</p>
+      ${answeredHtml}
+      <div class="unit-actions">
+        <button class="reject-button" data-clarify="${escapeHtml(key)}|no">Tidak</button>
+        <button class="text-button edit-button" data-clarifycorrect="${escapeHtml(key)}">✎ Pembetulan…</button>
+        <button class="approve-button" data-clarify="${escapeHtml(key)}|yes">✓ Ya</button>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
 let singleCardMode = false;
 let singleCardIndex = 0;
 
@@ -858,7 +890,8 @@ function finalFieldBlock(u, fieldKey){
     return `<div class="unit-field kind-${meta.kind}"><small>${meta.label} (editing)</small><textarea class="edit-textarea" id="editFinalTextarea" dir="auto">${escapeHtml(text)}</textarea></div>
       <div class="unit-actions"><button class="text-button" data-cancelfinaledit="1">Cancel</button><button class="approve-button" data-savefinaledit="${escapeHtml(u.id)}|${fieldKey}">✓ Save</button></div>`;
   }
-  return `<div class="final-field-wrap">${fieldBlock(meta.label, text, meta.cls, meta.kind)}<button class="text-button edit-button final-edit-btn" data-editfinal="${escapeHtml(u.id)}|${fieldKey}">✎ Edit</button></div>`;
+  return `<div class="final-field-wrap">${fieldBlock(meta.label, text, meta.cls, meta.kind)}<button class="text-button edit-button final-edit-btn" data-editfinal="${escapeHtml(u.id)}|${fieldKey}">✎ Edit</button></div>
+    ${renderClarifications(u.id, fieldKey, u[fieldKey].clarifications)}`;
 }
 
 function renderUnitList(){
@@ -932,6 +965,7 @@ function renderUnitList(){
            <div class="unit-actions"><button class="text-button" data-canceledit="${escapeHtml(u.id)}">Cancel</button><button class="approve-button" data-saveedit="${escapeHtml(u.id)}">✓ Save</button></div>`
         : `${fieldBlock(label, w.text, '', mode)}
            ${fieldBlock('CHATBOT NOTE', w.notes, 'note')}
+           ${renderClarifications(u.id, PHASES[mode].field, w.clarifications)}
            ${w.status === 'pending' ? `<div class="unit-actions"><button class="reject-button" data-reject="${escapeHtml(u.id)}">Reject</button><button class="text-button edit-button" data-edit="${escapeHtml(u.id)}">✎ Edit</button><button class="approve-button" data-approve="${escapeHtml(u.id)}">${approveLabel}</button></div>` : ''}
            ${w.status === 'approved' ? `<div class="unit-actions"><button class="reject-button" data-reject="${escapeHtml(u.id)}">Reopen for review</button><button class="text-button edit-button" data-edit="${escapeHtml(u.id)}">✎ Edit</button></div>` : ''}`
       }
@@ -992,6 +1026,14 @@ function memoryBlockFor(combinedText){
     : '';
 }
 
+// A free-text NOTES field is something an editor can read and then absentmindedly approve past
+// without ever actually resolving the doubt it raised. Asking the chatbot to phrase a genuine,
+// unresolved ambiguity as a one-click yes/no/correction question — instead of a paragraph of
+// prose — turns "the chatbot mentioned something" into "the editor made an explicit call on it".
+// Deliberately restrictive ("only for genuine, unresolved doubt") to avoid flooding every unit
+// with trivial questions, which would undo the whole point of a fast copy/paste review loop.
+const CLARIFY_FORMAT_NOTE = `If — and only if — something is genuinely ambiguous or uncertain in a way that could change meaning (not a routine wording choice you're confident about), phrase it as a direct question the editor can answer with one click, using this exact format inside NOTES: [Q1] <question>. Use [Q2], [Q3]... if there's more than one in the same unit. Do not raise a [Q] for anything you already have a confident answer for.`;
+
 // Only added to a prompt when a selected unit actually carries a folded-in footnote — most
 // units don't, and repeating this instruction on every batch regardless would be exactly the
 // prompt-bloat this app already avoids for Book Profile terms and Decision Memory.
@@ -1007,7 +1049,7 @@ function renderPromptParafrasa(sel){
   const body = sel.map(u => `[UNIT: ${u.id}]\n${u.source}`).join('\n\n');
   return `YOU ARE: ${srcLang} language editor performing PARAPHRASE-ONLY work on a manuscript. Do not translate to another language. Do not change the author's position, meaning, or tone. Only rephrase, staying in ${srcLang}.
 ${footnoteNoteFor(sel)}${bookProfileBlockFor()}${memoryBlockFor(sel.map(u => u.source).join('\n'))}
-For EACH unit below, return a ${srcLang} paraphrase and a short note flagging anything ambiguous, uncertain, or needing human attention (leave NOTES empty if there is nothing to flag).
+For EACH unit below, return a ${srcLang} paraphrase and a short note flagging anything ambiguous, uncertain, or needing human attention (leave NOTES empty if there is nothing to flag). ${CLARIFY_FORMAT_NOTE}
 
 UNITS:
 ${body}
@@ -1035,7 +1077,7 @@ WRITE LIKE ${/^[aeiou]/i.test(lang) ? 'AN' : 'A'} ${lang.toUpperCase()} NOVELIST
 - If the source's sentence structure would produce several consecutive ${lang} sentences starting with the same subject pronoun (e.g. "I... I... I..."), vary the sentence openings the way a ${lang} novelist would, without changing who is doing what.
 - A local dialect, register, or texture in the source (e.g. a distinctive regional accent, a class of speech, a turn of phrase specific to one place) usually has no exact ${lang} equivalent — don't flatten it into a plain explanatory phrase. Translate the literal meaning as best you can, then use NOTES to flag that a texture was lost, so the editor can decide whether it needs a Decision Memory ruling for consistency across the book.
 ${footnoteNoteFor(sel)}${bookProfileBlockFor()}${memoryBlockFor(sel.map(u => u.source + '\n' + u.parafrasa.text).join('\n'))}
-For EACH unit below, return a translation into ${lang} and a short note flagging anything ambiguous, uncertain, a lost cultural texture, or needing human attention (leave NOTES empty if there is nothing to flag).
+For EACH unit below, return a translation into ${lang} and a short note flagging anything ambiguous, uncertain, a lost cultural texture, or needing human attention (leave NOTES empty if there is nothing to flag). ${CLARIFY_FORMAT_NOTE}
 
 UNITS:
 ${body}
@@ -1056,7 +1098,7 @@ function renderPromptBackTranslation(sel){
 
 Do NOT improve, polish, reinterpret, or correct anything. Do NOT try to make it read naturally. Literalness matters more than elegance here. This is a mirror used to detect meaning drift against the original text, not a new translation.
 ${footnoteNoteFor(sel, u => u.translation.text)}
-For EACH unit below, return the literal back-translation and a short note only if something is structurally impossible to render literally (leave NOTES empty otherwise).
+For EACH unit below, return the literal back-translation and a short note only if something is structurally impossible to render literally (leave NOTES empty otherwise). ${CLARIFY_FORMAT_NOTE}
 
 UNITS:
 ${body}
@@ -1341,7 +1383,28 @@ $('unitList').addEventListener('click', e => {
   const approveBtn = t('approve'), rejectBtn = t('reject'), finalBtn = t('final'), unfinalBtn = t('unfinal');
   const editFinalBtn = t('editfinal'), saveFinalEditBtn = t('savefinaledit'), cancelFinalEditBtn = t('cancelfinaledit');
   const toggleDiffBtn = t('togglediff'), gotoBtBtn = t('gotobt');
+  const clarifyBtn = t('clarify'), clarifyCorrectBtn = t('clarifycorrect'), cancelClarifyBtn = t('cancelclarify'), saveClarifyBtn = t('saveclarify');
 
+  if(clarifyBtn){
+    const [unitId, field, qid, answer] = clarifyBtn.dataset.clarify.split('|');
+    const u = doc.units.find(x => x.id === unitId);
+    const c = u?.[field]?.clarifications?.find(x => x.id === qid);
+    if(c){ c.answer = answer; c.correctionText = ''; }
+    save(); renderUnitList();
+    return;
+  }
+  if(clarifyCorrectBtn){ editingClarifyKey = clarifyCorrectBtn.dataset.clarifycorrect; renderUnitList(); return; }
+  if(cancelClarifyBtn){ editingClarifyKey = null; renderUnitList(); return; }
+  if(saveClarifyBtn){
+    const [unitId, field, qid] = saveClarifyBtn.dataset.saveclarify.split('|');
+    const u = doc.units.find(x => x.id === unitId);
+    const c = u?.[field]?.clarifications?.find(x => x.id === qid);
+    const text = $('clarifyCorrectionInput').value.trim();
+    if(c && text){ c.answer = 'correction'; c.correctionText = text; }
+    editingClarifyKey = null;
+    save(); renderUnitList();
+    return;
+  }
   if(toggleDiffBtn){
     const id = toggleDiffBtn.dataset.togglediff;
     if(diffShownIds.has(id)) diffShownIds.delete(id); else diffShownIds.add(id);
@@ -1580,6 +1643,25 @@ function extractLabeled(chunk, label){
   const m = chunk.match(new RegExp(`\\[${label}\\]([\\s\\S]*?)(?=\\n\\[[A-Z_]+\\]|$)`, 'i'));
   return m ? m[1].trim() : '';
 }
+
+// Pulls [Q1] ... [Q2] ... blocks out of a NOTES field into clickable clarifications, keeping
+// whatever text comes before the first [Q] marker as an ordinary free-text note (so a chatbot
+// that ignores the [Q] format entirely degrades to exactly the old behavior — nothing is lost,
+// it just isn't a clarification card). A malformed or missing [Q] never drops content.
+function parseClarifications(notesText){
+  if(!notesText) return { notes: '', clarifications: [] };
+  const firstQIdx = notesText.search(/\[Q\d+\]/);
+  if(firstQIdx === -1) return { notes: notesText.trim(), clarifications: [] };
+  const notes = notesText.slice(0, firstQIdx).trim();
+  const qRegex = /\[Q(\d+)\]\s*([\s\S]*?)(?=\[Q\d+\]|$)/g;
+  const clarifications = [];
+  let m;
+  while((m = qRegex.exec(notesText)) !== null){
+    const question = m[2].trim();
+    if(question) clarifications.push({ id: `Q${m[1]}`, question, answer: null, correctionText: '' });
+  }
+  return { notes, clarifications };
+}
 function parseBatchResponse(raw){
   const re = /\[UNIT:\s*([^\]]+)\]/g;
   const marks = [];
@@ -1646,7 +1728,8 @@ $('processBtn').onclick = () => {
     if(!u){ unknown.push(id); return; }
     const text = extractLabeled(chunk, fieldLabel);
     if(!text) return;
-    u[targetField] = { text, notes: extractLabeled(chunk, 'NOTES'), status: 'pending' };
+    const { notes, clarifications } = parseClarifications(extractLabeled(chunk, 'NOTES'));
+    u[targetField] = { text, notes, clarifications, status: 'pending' };
     if(!firstAppliedId) firstAppliedId = id;
     applied++;
   });
