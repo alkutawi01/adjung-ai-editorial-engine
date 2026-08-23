@@ -312,6 +312,7 @@ function renderKeyTermsImport(){
   box.hidden = false;
   box.innerHTML = newTerms.length
     ? `<p class="hint-small">Key Terms recognised ${terms.length} term(s). Add the ${newTerms.length} not yet in Decision Memory as empty entries ready for you to fill in a ruling?</p>
+       <p class="hint-small">Creates ${newTerms.length} draft Decision Memory entr${newTerms.length === 1 ? 'y' : 'ies'} with no ruling — none of them affects a prompt until you write and save a ruling for it. Nothing is auto-accepted.</p>
        <button class="text-button" id="bpImportTerms">+ Add ${newTerms.length} term(s) to Decision Memory</button>`
     : `<p class="hint-small">All ${terms.length} Key Terms already have a Decision Memory entry.</p>`;
   if($('bpImportTerms')) $('bpImportTerms').onclick = () => {
@@ -322,6 +323,7 @@ function renderKeyTermsImport(){
 }
 
 $('copyBookScanBtn').onclick = () => copyWithFeedback($('bookScanPromptOut'), $('copyBookScanBtn'));
+$('bpReopenFromBar').onclick = () => { doc.bookProfile.status = 'pending'; save(); renderAll(); };
 
 $('processBookProfileBtn').onclick = () => {
   const raw = $('bookProfilePasteIn').value.trim();
@@ -565,9 +567,46 @@ function setPhase(next){
 
 $('phaseNav').addEventListener('click', e => {
   const tab = e.target.closest('.phase-tab');
-  if(!tab || tab.disabled) return;
-  setPhase(tab.dataset.phase);
+  if(!tab) return;
+  const name = tab.dataset.phase;
+  const locked = phaseLocked(name);
+  if(locked){
+    $('nextUnlockLine').hidden = false;
+    $('nextUnlockLine').textContent = unlockSentence(name);
+    return;
+  }
+  setPhase(name);
 });
+
+// What unlocks `name`, in two forms — a full sentence ("X unlocks after ...") for the tab's
+// hover title and the click explanation, and a short imperative clause ("approve a ...") for
+// the single "Next" line under the nav. Built from the same underlying gate check so the two
+// phrasings can never drift into describing different conditions.
+function unlockSentence(name){
+  const cfg = PHASES[name];
+  if(cfg.gate && !anyApproved(cfg.gate)){
+    const gatePhase = Object.values(PHASES).find(p => p.field === cfg.gate);
+    return `${cfg.label} unlocks after at least one ${gatePhase.label.toLowerCase()} is approved.`;
+  }
+  if(cfg.needsBookProfile && !bookProfileReady()) return `${cfg.label} unlocks after the Book Profile is approved.`;
+  return '';
+}
+function unlockImperative(name){
+  const cfg = PHASES[name];
+  if(cfg.gate && !anyApproved(cfg.gate)){
+    const gatePhase = Object.values(PHASES).find(p => p.field === cfg.gate);
+    return `approve a ${gatePhase.label.toLowerCase()}`;
+  }
+  if(cfg.needsBookProfile && !bookProfileReady()) return 'approve the Book Profile';
+  return '';
+}
+const PHASE_ORDER = ['parafrasa', 'translation', 'backtranslation', 'final'];
+function nextUnlockMessage(){
+  for(const name of PHASE_ORDER){
+    if(phaseLocked(name)) return `Next: ${unlockImperative(name)} to unlock ${PHASES[name].label}.`;
+  }
+  return null;
+}
 
 function renderPhaseNav(){
   document.querySelectorAll('.phase-tab').forEach(tab => {
@@ -575,16 +614,21 @@ function renderPhaseNav(){
     const locked = phaseLocked(name);
     tab.classList.toggle('active', phase === name);
     tab.classList.toggle('locked', !!locked);
-    tab.disabled = !!locked;
-    tab.title = locked || '';
+    // Kept focusable/clickable rather than truly `disabled` — a genuinely disabled button is
+    // invisible to keyboard navigation and a screen reader, and clicking it is exactly how the
+    // inline "why is this locked" explanation below gets triggered.
+    tab.disabled = false;
+    tab.setAttribute('aria-disabled', locked ? 'true' : 'false');
+    tab.title = locked ? unlockSentence(name) : '';
   });
   const count = f => (doc?.units || []).filter(u => u[f].status === 'approved').length;
   const pend = f => (doc?.units || []).filter(u => u[f].status === 'pending').length;
-  // A disabled tab that only explains itself on hover is invisible to anyone who doesn't think
-  // to hover a greyed-out button — the badge line says the unlock condition outright instead.
+  // A locked badge stays a short fixed "Locked" — the full unlock reason lives in one place
+  // (the "Next" line below the nav, or the inline explanation on click), not repeated three
+  // times in slightly different wording across three crowded tab badges.
   const badge = (el, name, approved, pending) => {
     const locked = phaseLocked(name);
-    $(el).textContent = locked ? locked : pending ? `${pending} to review` : approved ? `${approved} done` : '';
+    $(el).textContent = locked ? '🔒 Locked' : pending ? `${pending} to review` : approved ? `${approved} done` : '';
     $(el).className = 'phase-badge' + (locked ? ' locked' : pending ? ' pending' : approved ? ' done' : '');
   };
   $('badgeScan').textContent = doc?.bookProfile?.status === 'approved' ? 'done' : doc?.bookProfile?.status === 'pending' ? 'to review' : '';
@@ -594,8 +638,13 @@ function renderPhaseNav(){
   badge('badgeBack', 'backtranslation', count('backTranslation'), pend('backTranslation'));
   const finalCount = (doc?.units || []).filter(u => u.final).length;
   badge('badgeFinal', 'final', finalCount, 0);
-  if(!phaseLocked('final')) $('badgeFinal').textContent = finalCount ? `${finalCount} final` : '';
-  if(!phaseLocked('final')) $('badgeFinal').className = 'phase-badge' + (finalCount ? ' done' : '');
+  if(!phaseLocked('final')){
+    $('badgeFinal').textContent = finalCount ? `${finalCount} final` : '';
+    $('badgeFinal').className = 'phase-badge' + (finalCount ? ' done' : '');
+  }
+  const next = nextUnlockMessage();
+  $('nextUnlockLine').hidden = !next;
+  if(next) $('nextUnlockLine').textContent = next;
 }
 
 // ---- Rendering ---------------------------------------------------------------
@@ -994,6 +1043,15 @@ function renderAll(){
   if(phase === 'scan'){
     $('bookScanPromptOut').value = bookScanPromptText();
     $('targetLangInputScan').value = doc.targetLang || '';
+    const targetSet = (doc.targetLang || '').trim();
+    $('targetLangScanStatus').textContent = targetSet ? `✓ Set: ${doc.targetLang}` : 'Not set — optional for now, required before Translation unlocks.';
+    $('targetLangScanStatus').className = 'hint-small target-lang-status' + (targetSet ? ' set' : '');
+    // The copy/paste controls that built this profile are one-time setup — once approved, they
+    // no longer need to dominate the screen above the profile they produced. A collapsed bar
+    // still lets the editor reopen and redo the whole thing if the profile turns out wrong.
+    const bpApproved = doc.bookProfile?.status === 'approved';
+    $('bookScanCompleteBar').hidden = !bpApproved;
+    $('bookScanSteps').hidden = bpApproved;
     renderBookProfilePanel();
   }
   if(BATCH_PHASES.includes(phase)){
@@ -1025,7 +1083,15 @@ $('singleCardToggle').onchange = () => { singleCardMode = $('singleCardToggle').
 $('singleCardPrev').onclick = () => { singleCardIndex--; renderUnitList(); };
 $('singleCardNext').onclick = () => { singleCardIndex++; renderUnitList(); };
 $('targetLangInput').oninput = () => { if(doc){ doc.targetLang = $('targetLangInput').value; save(); $('targetLangInputScan').value = doc.targetLang; renderPrompt(); renderDocSummary(); } };
-$('targetLangInputScan').oninput = () => { if(doc){ doc.targetLang = $('targetLangInputScan').value; save(); $('targetLangInput').value = doc.targetLang; renderDocSummary(); } };
+$('targetLangInputScan').oninput = () => {
+  if(!doc) return;
+  doc.targetLang = $('targetLangInputScan').value; save();
+  $('targetLangInput').value = doc.targetLang;
+  renderDocSummary();
+  const targetSet = doc.targetLang.trim();
+  $('targetLangScanStatus').textContent = targetSet ? `✓ Set: ${doc.targetLang}` : 'Not set — optional for now, required before Translation unlocks.';
+  $('targetLangScanStatus').className = 'hint-small target-lang-status' + (targetSet ? ' set' : '');
+};
 $('sourceLangInput').oninput = () => { if(doc){ doc.sourceLang = $('sourceLangInput').value; save(); renderSourceLangSuggest(); renderPrompt(); } };
 
 // A free-text source language field trusts whatever the editor typed, with nothing to catch a
@@ -1269,10 +1335,16 @@ $('exportDocBtn').onclick = () => {
 // A "✓ Backup downloaded" toast that fades after 4 seconds tells an editor nothing 10 minutes
 // later when they're wondering whether they actually protected today's work — a persistent
 // "last downloaded" line does.
+function formatBackupTime(iso){
+  const d = new Date(iso);
+  const now = new Date();
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toDateString() === now.toDateString() ? `today, ${time}` : `${d.toLocaleDateString()}, ${time}`;
+}
 function renderBackupStatus(){
   const el = $('backupMsg');
   if(!el) return;
-  el.textContent = library.lastBackupAt ? `Last downloaded ${minutesAgo(library.lastBackupAt)}.` : 'No backup downloaded yet.';
+  el.textContent = library.lastBackupAt ? `Last backup downloaded: ${formatBackupTime(library.lastBackupAt)}` : 'No backup downloaded yet.';
 }
 $('backupBtn').onclick = () => {
   downloadJson(library, `adjung-translation-engine-backup.json`);

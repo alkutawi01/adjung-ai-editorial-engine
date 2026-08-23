@@ -52,6 +52,7 @@
       <button class="phase-tab" data-phase="backtranslation"><span class="phase-num">4</span><span class="phase-name">Back Translation</span><span class="phase-badge" id="badgeBack"></span></button>
       <button class="phase-tab" data-phase="final"><span class="phase-num">5</span><span class="phase-name">Final Review</span><span class="phase-badge" id="badgeFinal"></span></button>
     </nav>
+    <p id="nextUnlockLine" class="next-unlock-line" hidden></p>
 
     <div class="workspace">
       <aside class="sidebar">
@@ -73,23 +74,29 @@
         </div>
 
         <div class="phase-tools" id="toolsScan">
-          <p class="phase-intro">Send the whole book to your chatbot once, so it can describe the voice, style and risky terms before any unit work begins.</p>
-          <div class="sidebar-section" id="targetLangScanSection">
-            <h2>Target language</h2>
-            <p class="hint-small">Set this now if you already know it — it carries through to the Translation phase and can still be changed later.</p>
-            <input type="text" id="targetLangInputScan" placeholder="e.g. English, Arabic…">
+          <div class="sidebar-section" id="bookScanCompleteBar" hidden>
+            <p class="scan-complete-bar">✓ Book Profile complete <button class="text-button" id="bpReopenFromBar">Reopen for review</button></p>
           </div>
-          <div class="sidebar-section">
-            <h2>Step A · Copy this prompt</h2>
-            <p class="hint-small">Send it to your chatbot together with the full .docx file.</p>
-            <textarea id="bookScanPromptOut" class="prompt-out" readonly></textarea>
-            <button class="copy-button" id="copyBookScanBtn">▣ Copy prompt</button>
-          </div>
-          <div class="sidebar-section">
-            <h2>Step B · Paste the reply</h2>
-            <textarea id="bookProfilePasteIn" class="paste-in" placeholder="Paste the chatbot's Book Profile here…"></textarea>
-            <button class="primary-button" id="processBookProfileBtn">Process Book Profile →</button>
-            <p id="bookProfileError" class="upload-error" role="alert"></p>
+          <div id="bookScanSteps">
+            <p class="phase-intro">Send the whole book to your chatbot once, so it can describe the voice, style and risky terms before any unit work begins.</p>
+            <div class="sidebar-section" id="targetLangScanSection">
+              <h2>Target language</h2>
+              <p class="hint-small">Set this now if you already know it — it carries through to the Translation phase and can still be changed later.</p>
+              <input type="text" id="targetLangInputScan" placeholder="e.g. English, Arabic…">
+              <p id="targetLangScanStatus" class="hint-small target-lang-status"></p>
+            </div>
+            <div class="sidebar-section">
+              <h2>Step A · Copy this prompt</h2>
+              <p class="hint-small">Send it to your chatbot together with the full .docx file.</p>
+              <textarea id="bookScanPromptOut" class="prompt-out" readonly></textarea>
+              <button class="copy-button" id="copyBookScanBtn">▣ Copy prompt</button>
+            </div>
+            <div class="sidebar-section">
+              <h2>Step B · Paste the reply</h2>
+              <textarea id="bookProfilePasteIn" class="paste-in" placeholder="Paste the chatbot's Book Profile here…"></textarea>
+              <button class="primary-button" id="processBookProfileBtn">Process Book Profile →</button>
+              <p id="bookProfileError" class="upload-error" role="alert"></p>
+            </div>
           </div>
         </div>
 
