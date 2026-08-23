@@ -1039,10 +1039,17 @@ const CLARIFY_FORMAT_NOTE = `If — and only if — something is genuinely ambig
 // A [Q] catches "I don't know what this means, you decide" — a specific, resolvable doubt about
 // meaning. It does NOT catch "I did my best but I'm not fully happy with this rendering" — a
 // softer self-assessment of the work's own quality, with no specific question to ask. A letter
-// grade (not a 0-100 number: LLM-reported percentages cluster in a narrow high band regardless of
-// actual quality — a coarse, honest category is more trustworthy than false numeric precision)
-// gives the editor a scan-and-triage signal across a whole batch without adding much prompt cost.
-const CONFIDENCE_GRADE_NOTE = `Also add a [CONFIDENCE] line with a single letter grade for your own work on this unit: A = fully confident, no reservations. B = reasonably confident, but a careful native reader might choose different wording or phrasing here. C = meaningfully uncertain about tone, register, or how well this rendering lands — flag it for closer human review. Grade honestly and use the full range — most units should not automatically be A.`;
+// grade (not a 0-100 number: tested both live against the same hard sentences — a wordplay pun
+// and a rhyming pantun — and a 0-100 score clustered just as high, 86-91, as the letter grade's
+// default-A; switching to a number bought nothing) gives the editor a scan-and-triage signal
+// across a whole batch without adding much prompt cost.
+//
+// The real fix for "confident A hiding a real weakness" turned out to be neither letters nor
+// numbers — it was making NOTES mandatory. In live testing, a chatbot graded the same pun-loss
+// 'A' with empty NOTES when NOTES was optional, then produced the exact same 'A' but with an
+// honest one-line admission of what didn't survive translation once NOTES was required outright.
+// The grade doesn't have to drop for the editor to get the information that actually matters.
+const CONFIDENCE_GRADE_NOTE = `Also add a [CONFIDENCE] line with a single letter grade for your own work on this unit: A = fully confident, no reservations. B = reasonably confident, but a careful native reader might choose different wording or phrasing here. C = meaningfully uncertain about tone, register, or how well this rendering lands — flag it for closer human review. Grade honestly and use the full range — most units should not automatically be A. Regardless of grade, NOTES must never be left empty for this reason alone — even at grade A, name in one sentence the single hardest thing about this unit to render (a wordplay, a rhyme, a register, a cultural texture), so the editor sees your reasoning, not just a letter. If there is also a genuine [Q] to raise, add it after that sentence.`;
 
 // Only added to a prompt when a selected unit actually carries a folded-in footnote — most
 // units don't, and repeating this instruction on every batch regardless would be exactly the
