@@ -144,6 +144,14 @@
             <button class="text-button" id="clearSentBtn">Clear sent status (mark as failed, allow re-pick)</button>
           </div>
 
+          <div class="sidebar-section pilot-banner" id="pilotBannerSection" hidden>
+            <p id="pilotBannerText" class="hint-small"></p>
+            <div class="unit-actions">
+              <button class="text-button" id="pilotRefineBtn">Refine Guide first</button>
+              <button class="approve-button" id="pilotConfirmBtn">✓ Confirm — use for the rest of the book</button>
+            </div>
+          </div>
+
           <!-- Only the step the editor is actually on stays open; the other two collapse to a
                one-line summary of what happened in them, so this batch loop (pick → copy → paste,
                repeated dozens of times per manuscript) doesn't ask the editor to re-parse all
@@ -154,9 +162,10 @@
             <div class="select-row">
               <button class="text-button" id="selectAllBtn">Select all filtered</button>
               <button class="text-button" id="suggestBatchBtn">Suggested batch</button>
+              <button class="text-button" id="pilotBatchBtn">🧪 Pilot (2 units)</button>
               <button class="text-button" id="selectNoneBtn">Clear</button>
             </div>
-            <p class="hint-small">Limits exist because a chatbot's reply can cut out mid-batch on very long prompts, and a smaller batch is easier to review carefully. "Suggested batch" adds up to 5 more not-yet-started units, good for one comfortable review pass; "Select all filtered" fills up to the hard limit below in one go.</p>
+            <p class="hint-small">Limits exist because a chatbot's reply can cut out mid-batch on very long prompts, and a smaller batch is easier to review carefully. "Suggested batch" adds up to 5 more not-yet-started units, good for one comfortable review pass; "Select all filtered" fills up to the hard limit below in one go. New book? Run "Pilot" through all three phases first — confirm the Translation Guide fits before committing the rest of the book to it.</p>
             <p id="selectedCount" class="selected-count">0 selected</p>
             <p id="batchWarning" class="batch-warning" role="status"></p>
           </details>

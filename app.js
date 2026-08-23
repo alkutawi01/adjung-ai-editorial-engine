@@ -69,6 +69,7 @@ function normalizeDoc(d){
   if(!d.decisionMemory) d.decisionMemory = [];
   if(d.targetLang === undefined) d.targetLang = '';
   if(d.sourceLang === undefined) d.sourceLang = '';
+  if(d.pilotConfirmed === undefined) d.pilotConfirmed = false;
   (d.units || []).forEach(u => {
     if(!u.parafrasa) u.parafrasa = blankWork();
     if(!u.translation) u.translation = blankWork();
@@ -1314,6 +1315,7 @@ function renderAll(){
   renderChapterFilter();
   renderDocSummary();
   renderSentBanner();
+  renderPilotBanner();
   renderUnitList();
   renderPrompt();
 }
@@ -1423,6 +1425,49 @@ $('suggestBatchBtn').onclick = () => {
     : 'No unstarted units left to suggest — everything filtered is already sent, pending, or approved.';
   renderUnitList(); renderPrompt(); renderSourceLangSuggest();
 };
+
+// A pilot deliberately carries a SMALL number of units through the whole pipeline first — the
+// Translation Guide and Decision Memory rulings it produces then apply to the rest of the book.
+// This is advisory only: nothing technically blocks picking more units without confirming a
+// pilot, matching the constitution's rule that the system proposes, it never decides for the
+// editor. Same picker as Suggested batch, just capped at 2.
+const PILOT_BATCH_UNITS = 2;
+$('pilotBatchBtn').onclick = () => {
+  $('batchWarning').textContent = '';
+  let stats = batchStatsFor((doc?.units || []).filter(u => selected.has(u.id)));
+  let picked = 0;
+  for(const u of filteredUnits()){
+    if(picked >= PILOT_BATCH_UNITS) break;
+    const s = workField(u).status;
+    if(s !== 'none' && s !== 'rejected') continue;
+    if(selected.has(u.id)) continue;
+    const sentences = countSentences(u.source);
+    if(stats.chars + u.source.length > BATCH_MAX_CHARS || stats.sentences + sentences > BATCH_MAX_SENTENCES) break;
+    selected.add(u.id);
+    stats.chars += u.source.length; stats.sentences += sentences;
+    picked++;
+  }
+  $('batchWarning').textContent = picked
+    ? `Pilot batch selected: ${picked} unit(s). Carry these through Paraphrase, Translation and Back Translation, then confirm the Guide before doing the rest of the book.`
+    : 'No unstarted units left to pilot.';
+  renderUnitList(); renderPrompt(); renderSourceLangSuggest();
+};
+
+// Dismissing (not confirming) hides the banner for the rest of this session so it doesn't nag on
+// every render, but doesn't set pilotConfirmed — it comes back next session as a reminder, since
+// the editor hasn't actually made a call on the Guide yet.
+let pilotBannerDismissed = false;
+function renderPilotBanner(){
+  const section = $('pilotBannerSection');
+  if(!doc || !BATCH_PHASES.includes(phase)){ section.hidden = true; return; }
+  const approvedCount = (doc?.units || []).filter(u => u.backTranslation.status === 'approved').length;
+  const show = !doc.pilotConfirmed && !pilotBannerDismissed && approvedCount >= 1 && approvedCount <= PILOT_BATCH_UNITS + 1 && doc.units.length > PILOT_BATCH_UNITS;
+  section.hidden = !show;
+  if(!show) return;
+  $('pilotBannerText').textContent = `🧪 ${approvedCount} unit(s) have gone all the way through Paraphrase → Translation → Back Translation. Read them over — is the voice, terminology and register right? Confirm before picking more units for the rest of the book.`;
+}
+$('pilotConfirmBtn').onclick = () => { doc.pilotConfirmed = true; save(); renderPilotBanner(); };
+$('pilotRefineBtn').onclick = () => { pilotBannerDismissed = true; renderPilotBanner(); };
 $('selectNoneBtn').onclick = () => { selected.clear(); $('batchWarning').textContent = ''; $('promptOut').value = ''; renderUnitList(); renderPrompt(); renderSourceLangSuggest(); };
 $('unitList').addEventListener('change', e => {
   const cb = e.target.closest('input[data-select]');

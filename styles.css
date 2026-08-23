@@ -356,6 +356,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .target-lang-status{color:var(--warn)}
 .target-lang-status.set{color:var(--success)}
 .backtranslation-info{padding:7px 10px;border-radius:var(--r-sm);background:var(--paper);border:1px solid var(--line)}
+.pilot-banner{padding:11px 13px;border-radius:var(--r-md);background:var(--maroon-tint);border:1px solid #e0b6bd}
+.pilot-banner .unit-actions{margin-top:8px}
 .target-lang-row{margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
 .prompt-summary .summary-toggle{border:0;background:transparent;color:var(--maroon);font:600 11px var(--font-sans);cursor:pointer;padding:0;text-decoration:underline}
 .prompt-summary-preview{margin-top:6px;padding-top:6px;border-top:1px dashed var(--line-strong);white-space:pre-wrap;color:var(--ink-soft)}
