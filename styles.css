@@ -217,7 +217,19 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .unit-status.approved{background:var(--success-tint);color:var(--success)}
 .unit-status.rejected{background:var(--error-tint);color:var(--error)}
 .unit-status.stale{background:var(--warn-tint);color:var(--warn);border:1px solid var(--warn)}
-.stale-banner{margin:10px 0 0;padding:8px 11px;border-radius:var(--r-sm);background:var(--warn-tint);color:var(--warn);font:600 12px var(--font-sans)}
+.stale-banner{margin:10px 0 0;padding:8px 11px;border-radius:var(--r-sm);background:var(--warn-tint);color:var(--warn);font:600 12px var(--font-sans);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.stale-banner .text-button{color:var(--warn);white-space:nowrap}
+
+/* Sticks to the bottom of the viewport for as long as any part of ITS OWN card is still on
+   screen (sticky is scoped to its containing block), so Mark FINAL / Unmark FINAL stays reachable
+   on a long unit without needing to scroll past three full text blocks first — but still scrolls
+   away normally once the editor moves on to the next card. */
+.final-actions-sticky{position:sticky;bottom:0;background:#fff;padding:10px 0 2px;margin-top:14px !important;border-top:1px solid var(--line);box-shadow:0 -6px 10px -6px rgba(17,17,17,.08)}
+
+.diff-field{background:var(--paper);border-radius:var(--r-md);padding:9px 11px}
+.diff-field p{font:14px/1.7 var(--font-serif)}
+.diff-field del{color:var(--error);background:var(--error-tint);text-decoration:line-through;padding:0 2px;border-radius:3px}
+.diff-field ins{color:var(--success);background:var(--success-tint);text-decoration:none;padding:0 2px;border-radius:3px}
 
 .unit-field{margin-top:10px;padding-left:11px;border-left:3px solid transparent}
 .unit-field small{display:block;color:#78716c;font:600 9px var(--font-mono);letter-spacing:.07em;margin-bottom:4px;text-transform:uppercase}

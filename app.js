@@ -685,9 +685,18 @@ function filteredUnits(){
   const statusF = $('statusFilter').value;
   const chapterF = $('chapterFilter').value;
   if(phase === 'final'){
-    return doc.units.filter(u => u.backTranslation.status === 'approved'
+    // A unit whose Back Translation went stale mid-review used to just vanish from this list —
+    // technically correct (it's no longer ready), but an editor working through Final Review has
+    // no reason to know that's WHY it's gone. Keeping it visible with its own filter bucket means
+    // "why did U0007 disappear" never has to be answered by switching phases to go look for it.
+    return doc.units.filter(u => (u.backTranslation.status === 'approved' || u.backTranslation.status === 'stale')
       && matchesQuery(u)
-      && (!chapterF || u.chapter === chapterF));
+      && (!chapterF || u.chapter === chapterF)
+      && (!statusF || (
+        statusF === 'final' ? u.final :
+        statusF === 'ready' ? (!u.final && u.backTranslation.status === 'approved') :
+        statusF === 'stale' ? u.backTranslation.status === 'stale' : true
+      )));
   }
   const cfg = PHASES[mode];
   return doc.units.filter(u => {
@@ -709,10 +718,16 @@ function renderChapterFilter(){
 function renderStatusFilterOptions(){
   const sel = $('statusFilter');
   const current = sel.value;
-  const noneLabel = { parafrasa: 'No paraphrase yet', translation: 'No translation yet', backtranslation: 'No back translation yet' }[mode];
-  const options = [['', 'All statuses'], ['none', noneLabel], ['sent', 'Sent — awaiting reply'], ['pending', 'Awaiting review'], ['approved', 'Approved'], ['stale', 'Stale — rerun needed'], ['rejected', 'Rejected']];
+  let options;
+  if(phase === 'final'){
+    options = [['', 'All'], ['ready', 'Ready for final review'], ['final', 'Marked FINAL'], ['stale', 'Incomplete / needs rerun']];
+  } else {
+    const noneLabel = { parafrasa: 'No paraphrase yet', translation: 'No translation yet', backtranslation: 'No back translation yet' }[mode];
+    options = [['', 'All statuses'], ['none', noneLabel], ['sent', 'Sent — awaiting reply'], ['pending', 'Awaiting review'], ['approved', 'Approved'], ['stale', 'Stale — rerun needed'], ['rejected', 'Rejected']];
+  }
   sel.innerHTML = options.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
   if(options.some(([v]) => v === current)) sel.value = current;
+  else sel.value = '';
 }
 
 function renderDocSummary(){
@@ -755,7 +770,13 @@ function renderDocSummary(){
 }
 
 function emptyStateMessage(){
-  if(phase === 'final') return 'No units have an approved back translation yet.';
+  if(phase === 'final'){
+    const f = $('statusFilter').value;
+    if(f === 'final') return 'No units marked FINAL yet.';
+    if(f === 'stale') return 'Nothing incomplete right now — no unit needs a rerun.';
+    if(f === 'ready') return 'Nothing ready to mark FINAL — every reviewable unit is already FINAL, or none have an approved back translation yet.';
+    return 'No units have an approved back translation yet.';
+  }
   const statusF = $('statusFilter').value;
   const label = PHASES[mode].label.toLowerCase();
   if(statusF === 'pending') return `Nothing waiting for review. Pick fresh units on the left to send for ${label}.`;
@@ -783,6 +804,40 @@ function fieldBlock(label, text, cls, kind){
 
 let singleCardMode = false;
 let singleCardIndex = 0;
+
+// Original and Back Translation are meant to end up close to identical (both in the source
+// language — Back Translation is a literal mirror of the Translation, back into that language),
+// which is exactly what makes a word-level diff between them useful: real drift shows up as
+// visible insertions/deletions instead of requiring the editor to read both blocks in full and
+// hold the comparison in their head. Classic LCS diff on whitespace-preserving tokens, no library.
+let diffShownIds = new Set();
+function diffWords(a, b){
+  const aw = a.split(/(\s+)/), bw = b.split(/(\s+)/);
+  const n = aw.length, m = bw.length;
+  const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for(let i = n - 1; i >= 0; i--){
+    for(let j = m - 1; j >= 0; j--){
+      dp[i][j] = aw[i] === bw[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const ops = [];
+  let i = 0, j = 0;
+  while(i < n && j < m){
+    if(aw[i] === bw[j]){ ops.push({ type: 'same', text: aw[i] }); i++; j++; }
+    else if(dp[i + 1][j] >= dp[i][j + 1]){ ops.push({ type: 'del', text: aw[i] }); i++; }
+    else { ops.push({ type: 'add', text: bw[j] }); j++; }
+  }
+  while(i < n){ ops.push({ type: 'del', text: aw[i] }); i++; }
+  while(j < m){ ops.push({ type: 'add', text: bw[j] }); j++; }
+  return ops;
+}
+function renderDiffHtml(a, b){
+  return diffWords(a, b).map(op => {
+    if(op.type === 'same') return escapeHtml(op.text);
+    if(op.type === 'del') return `<del>${escapeHtml(op.text)}</del>`;
+    return `<ins>${escapeHtml(op.text)}</ins>`;
+  }).join('');
+}
 
 // Final Review used to be read-only: catching a mistake there meant leaving the screen,
 // remembering which of three phases it came from, hunting the unit down again by search,
@@ -829,15 +884,26 @@ function renderUnitList(){
     if(u.chapter !== lastChapter){ html += `<div class="chapter-heading" dir="auto">${escapeHtml(u.chapter)}</div>`; lastChapter = u.chapter; }
 
     if(phase === 'final'){
+      const isStale = u.backTranslation.status === 'stale';
+      const showingDiff = diffShownIds.has(u.id);
+      const diffBlock = showingDiff
+        ? `<div class="unit-field diff-field"><small>DIFFERENCES — ORIGINAL → BACK TRANSLATION</small><p dir="auto">${renderDiffHtml(u.source, u.backTranslation.text)}</p></div>`
+        : '';
       html += `<div class="unit-card">
-        <div class="unit-card-head"><b>${escapeHtml(u.id)}</b>${u.final ? '<span class="unit-status approved">FINAL</span>' : '<span class="unit-status pending">Not final</span>'}</div>
+        <div class="unit-card-head"><b>${escapeHtml(u.id)}</b>${u.final ? '<span class="unit-status approved">FINAL</span>' : isStale ? '<span class="unit-status stale">Needs rerun</span>' : '<span class="unit-status pending">Not final</span>'}</div>
         ${fieldBlock('ORIGINAL', u.source, '', 'original')}
         ${finalFieldBlock(u, 'parafrasa')}
         ${finalFieldBlock(u, 'translation')}
-        ${finalFieldBlock(u, 'backTranslation')}
-        <div class="unit-actions">${u.final
-          ? `<button class="reject-button" data-unfinal="${escapeHtml(u.id)}">Unmark FINAL</button>`
-          : `<button class="approve-button" data-final="${escapeHtml(u.id)}">✓ Mark FINAL</button>`}</div>
+        ${isStale
+          ? `<p class="stale-banner">⚠ Back Translation is stale — it no longer matches the current Translation. <button class="text-button" data-gotobt="${escapeHtml(u.id)}">Go rerun it →</button></p>`
+          : `${finalFieldBlock(u, 'backTranslation')}
+             <button class="text-button" data-togglediff="${escapeHtml(u.id)}">${showingDiff ? '✕ Hide differences' : '🔍 Show differences (Original ↔ Back Translation)'}</button>
+             ${diffBlock}`}
+        <div class="unit-actions final-actions-sticky">${isStale
+          ? `<span class="hint-small">Rerun Back Translation before this unit can be marked FINAL again.</span>`
+          : u.final
+            ? `<button class="reject-button" data-unfinal="${escapeHtml(u.id)}">Unmark FINAL</button>`
+            : `<button class="approve-button" data-final="${escapeHtml(u.id)}">✓ Mark FINAL</button>`}</div>
       </div>`;
       if(u.sceneBreakAfter) html += `<div class="scene-break-marker">✦ scene break ✦</div>`;
       return;
@@ -1087,8 +1153,16 @@ function renderAll(){
   $('bookProfilePanel').hidden = phase !== 'scan';
   $('unitList').hidden = phase === 'scan';
   $('filterRow').hidden = phase === 'scan';
-  $('statusFilter').hidden = phase === 'final';
   $('panelTitle').textContent = PHASES[phase].panelTitle;
+  if(phase === 'final'){
+    renderStatusFilterOptions();
+    // "Export FINAL units" on its own reads as "export everything" to someone who hasn't been
+    // tracking the FINAL count closely — naming the actual number on the button itself is what
+    // stops a 1-of-19 export from being mistaken for the whole book.
+    const finalCount = doc.units.filter(u => u.final).length;
+    $('exportDocBtn').textContent = `⬇ Export ${finalCount} FINAL unit${finalCount === 1 ? '' : 's'} (.doc)`;
+    $('exportBtn').textContent = `⬇ Export ${finalCount} FINAL unit${finalCount === 1 ? '' : 's'} (.json)`;
+  }
 
   if(phase === 'scan'){
     $('bookScanPromptOut').value = bookScanPromptText();
@@ -1260,7 +1334,21 @@ $('unitList').addEventListener('click', e => {
   const editBtn = t('edit'), saveEditBtn = t('saveedit'), cancelEditBtn = t('canceledit');
   const approveBtn = t('approve'), rejectBtn = t('reject'), finalBtn = t('final'), unfinalBtn = t('unfinal');
   const editFinalBtn = t('editfinal'), saveFinalEditBtn = t('savefinaledit'), cancelFinalEditBtn = t('cancelfinaledit');
+  const toggleDiffBtn = t('togglediff'), gotoBtBtn = t('gotobt');
 
+  if(toggleDiffBtn){
+    const id = toggleDiffBtn.dataset.togglediff;
+    if(diffShownIds.has(id)) diffShownIds.delete(id); else diffShownIds.add(id);
+    renderUnitList();
+    return;
+  }
+  if(gotoBtBtn){
+    const id = gotoBtBtn.dataset.gotobt;
+    setPhase('backtranslation');
+    $('unitSearch').value = id;
+    $('unitSearch').dispatchEvent(new Event('input'));
+    return;
+  }
   if(editBtn){ editingUnitId = editBtn.dataset.edit; renderUnitList(); return; }
   if(cancelEditBtn){ editingUnitId = null; renderUnitList(); return; }
   if(saveEditBtn){
@@ -1297,8 +1385,8 @@ $('unitList').addEventListener('click', e => {
       const stagesOnly = invalidated.filter(x => x !== 'FINAL');
       if(invalidated.length){
         $('finalEditNotice').textContent = stagesOnly.length
-          ? `${id} edited — ${stagesOnly.join(' and ')} now stale and FINAL unmarked. This unit leaves Final Review until the stale stage(s) are rerun and reapproved.`
-          : `${id} edited — automatically unmarked FINAL. Review and Mark FINAL again when ready.`;
+          ? `${id}: ${stagesOnly.join(' and ')} now stale, FINAL removed — rerun the stale stage(s) before this unit returns to Final Review.`
+          : `${id}: FINAL removed — review this unit again before export.`;
         setTimeout(() => { $('finalEditNotice').textContent = ''; }, 8000);
       }
     }
