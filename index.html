@@ -92,11 +92,16 @@
               <input type="text" id="targetLangInputScan" placeholder="e.g. English, Arabic…">
               <p id="targetLangScanStatus" class="hint-small target-lang-status"></p>
             </div>
-            <div class="sidebar-section">
+            <div class="sidebar-section" id="stepASection" style="position:relative">
               <h2>Step A · Copy this prompt</h2>
               <p class="hint-small">Send it to your chatbot together with the full .docx file.</p>
               <textarea id="bookScanPromptOut" class="prompt-out" readonly></textarea>
               <button class="copy-button" id="copyBookScanBtn">▣ Copy prompt</button>
+              <div id="scanCoachTip" class="coach-tip" hidden>
+                <span class="coach-tip-arrow"></span>
+                <p>👋 Start here — copy this, then send it to your chatbot together with the .docx file you just uploaded.</p>
+                <button class="text-button" id="scanCoachTipDismiss">Got it</button>
+              </div>
             </div>
             <div class="sidebar-section">
               <h2>Step B · Paste the reply</h2>

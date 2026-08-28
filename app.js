@@ -78,6 +78,7 @@ function normalizeDoc(d){
   if(d.targetLang === undefined) d.targetLang = '';
   if(d.sourceLang === undefined) d.sourceLang = '';
   if(d.pilotConfirmed === undefined) d.pilotConfirmed = false;
+  if(d.scanCoachDismissed === undefined) d.scanCoachDismissed = false;
   (d.units || []).forEach(u => {
     if(!u.parafrasa) u.parafrasa = blankWork();
     if(!u.translation) u.translation = blankWork();
@@ -283,18 +284,13 @@ function renderBookProfilePanel(){
   }).join('');
 
   if(bp.status === 'none'){
-    // The upload screen disappears the instant a book loads, so this empty state is the first
-    // thing an editor actually sees afterward — it has to do double duty as "yes, that worked"
-    // AND "here's exactly what to click next", or it reads as a blank screen with no confirmation
-    // anything happened at all.
+    // The upload screen disappears the instant a book loads, so this is the first thing an
+    // editor sees afterward — it has to at least confirm "yes, that worked". Where to go next is
+    // no longer a list here for the editor to read and then go hunting for a matching button —
+    // it's a coach mark pointing directly at Step A's Copy button (see renderScanCoachTip).
     $('bookProfileFields').innerHTML = `<div class="empty-state">
       <p class="upload-success-line">✓ "${escapeHtml(doc.fileName)}" uploaded — ${doc.units.length} unit${doc.units.length === 1 ? '' : 's'} across ${currentChapters().length} section${currentChapters().length === 1 ? '' : 's'}.</p>
-      <p class="empty-state-next-label">Next:</p>
-      <ol class="empty-state-steps">
-        <li>Copy the prompt in <b>Step A</b> on the left</li>
-        <li>Send it to your chatbot together with the original .docx file</li>
-        <li>Paste the chatbot's reply into <b>Step B</b> and click Process</li>
-      </ol>
+      <p>Follow Step A in the sidebar to get started.</p>
     </div>`;
     $('bookProfileActions').innerHTML = '';
     return;
@@ -354,7 +350,23 @@ function renderKeyTermsImport(){
   };
 }
 
-$('copyBookScanBtn').onclick = () => copyWithFeedback($('bookScanPromptOut'), $('copyBookScanBtn'));
+// A coach mark pointing at the actual button an editor needs to click, instead of a numbered
+// list they have to read and then go find the matching element for. Dismisses itself the moment
+// the editor does the thing it's telling them to do (copies the prompt) — clicking "Got it"
+// without ever copying would be a stranger signal of intent than just... copying.
+function renderScanCoachTip(){
+  const tip = $('scanCoachTip');
+  if(!tip) return;
+  tip.hidden = !(doc && doc.bookProfile?.status === 'none' && !doc.scanCoachDismissed);
+}
+function dismissScanCoachTip(){
+  if(!doc || doc.scanCoachDismissed) return;
+  doc.scanCoachDismissed = true;
+  save();
+  renderScanCoachTip();
+}
+$('scanCoachTipDismiss').onclick = dismissScanCoachTip;
+$('copyBookScanBtn').onclick = () => { copyWithFeedback($('bookScanPromptOut'), $('copyBookScanBtn')); dismissScanCoachTip(); };
 $('bpReopenFromBar').onclick = () => { doc.bookProfile.status = 'pending'; save(); renderAll(); };
 
 // Importing a Guide from an earlier book in the same series pre-fills this book's fields and
@@ -1462,6 +1474,7 @@ function renderAll(){
     $('bookScanCompleteBar').hidden = !bpApproved;
     $('bookScanSteps').hidden = bpApproved;
     renderBookProfilePanel();
+    renderScanCoachTip();
   }
   if(BATCH_PHASES.includes(phase)){
     $('phaseIntro').textContent = PHASES[mode].intro;

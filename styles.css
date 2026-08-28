@@ -278,9 +278,18 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 
 .unit-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
 .empty-state{padding:48px 24px;text-align:center;color:var(--faint);font-size:12px;border:1.5px dashed var(--line);border-radius:var(--r-lg);background:var(--paper)}
-.upload-success-line{margin:0 0 16px;color:var(--success);font:600 13px var(--font-sans)}
-.empty-state-next-label{margin:0 0 4px;font:600 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--maroon)}
-.empty-state-steps{display:inline-block;text-align:left;margin:0;padding-left:18px;font-size:12px;line-height:1.8;color:var(--ink-soft)}
+.upload-success-line{margin:0 0 8px;color:var(--success);font:600 13px var(--font-sans)}
+
+/* Points at the actual button an editor needs to click next, rather than a numbered list they'd
+   have to read and then go hunt for the matching element themselves. Positioned relative to its
+   parent .sidebar-section (position:relative set inline on that element), sitting just below the
+   Copy button it's pointing at. */
+.coach-tip{position:relative;margin-top:10px;padding:12px 14px;border-radius:var(--r-md);background:var(--maroon);color:#fff;box-shadow:var(--shadow-md);animation:coach-tip-in .25s var(--ease)}
+.coach-tip-arrow{position:absolute;top:-7px;left:24px;width:14px;height:14px;background:var(--maroon);transform:rotate(45deg);border-radius:2px}
+.coach-tip p{margin:0 0 8px;font-size:12px;line-height:1.5}
+.coach-tip .text-button{color:#fff;text-decoration:underline;font-size:11px;padding:0}
+.coach-tip .text-button:hover{color:#f4dce0}
+@keyframes coach-tip-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 .hint-small{color:var(--muted);font-size:11px;line-height:1.5;margin:0 0 8px}
 
 #bookProfileSection h2,#decisionMemorySection h2{display:flex;align-items:center;gap:8px}
