@@ -278,6 +278,9 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 
 .unit-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
 .empty-state{padding:48px 24px;text-align:center;color:var(--faint);font-size:12px;border:1.5px dashed var(--line);border-radius:var(--r-lg);background:var(--paper)}
+.upload-success-line{margin:0 0 16px;color:var(--success);font:600 13px var(--font-sans)}
+.empty-state-next-label{margin:0 0 4px;font:600 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--maroon)}
+.empty-state-steps{display:inline-block;text-align:left;margin:0;padding-left:18px;font-size:12px;line-height:1.8;color:var(--ink-soft)}
 .hint-small{color:var(--muted);font-size:11px;line-height:1.5;margin:0 0 8px}
 
 #bookProfileSection h2,#decisionMemorySection h2{display:flex;align-items:center;gap:8px}

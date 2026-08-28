@@ -7,7 +7,15 @@ async function copyWithFeedback(textareaEl, btnEl){
   const original = btnEl.textContent;
   let ok = false;
   try{ await navigator.clipboard.writeText(textareaEl.value); ok = true; }catch(e){ ok = false; }
+  // The modern Clipboard API silently throws in a handful of real situations that have nothing
+  // to do with the user doing anything wrong — an embedded/iframed context without clipboard
+  // permission granted, a tab that briefly lost focus, some corporate browser policies. The old
+  // execCommand('copy') API works via a plain text selection instead of a permission grant, so
+  // it succeeds in several cases where the modern API doesn't — worth trying before giving up.
   textareaEl.select();
+  if(!ok){
+    try{ ok = document.execCommand('copy'); }catch(e){ ok = false; }
+  }
   btnEl.textContent = ok ? '✓ Copied!' : '⚠ Copy failed. Text selected, use Ctrl+C';
   btnEl.classList.toggle('copied', ok);
   setTimeout(() => { btnEl.textContent = original; btnEl.classList.remove('copied'); }, 2000);
@@ -275,7 +283,19 @@ function renderBookProfilePanel(){
   }).join('');
 
   if(bp.status === 'none'){
-    $('bookProfileFields').innerHTML = '<div class="empty-state">No Translation Guide yet. Copy the prompt on the left, send it to your chatbot with the book file, then paste the reply.</div>';
+    // The upload screen disappears the instant a book loads, so this empty state is the first
+    // thing an editor actually sees afterward — it has to do double duty as "yes, that worked"
+    // AND "here's exactly what to click next", or it reads as a blank screen with no confirmation
+    // anything happened at all.
+    $('bookProfileFields').innerHTML = `<div class="empty-state">
+      <p class="upload-success-line">✓ "${escapeHtml(doc.fileName)}" uploaded — ${doc.units.length} unit${doc.units.length === 1 ? '' : 's'} across ${currentChapters().length} section${currentChapters().length === 1 ? '' : 's'}.</p>
+      <p class="empty-state-next-label">Next:</p>
+      <ol class="empty-state-steps">
+        <li>Copy the prompt in <b>Step A</b> on the left</li>
+        <li>Send it to your chatbot together with the original .docx file</li>
+        <li>Paste the chatbot's reply into <b>Step B</b> and click Process</li>
+      </ol>
+    </div>`;
     $('bookProfileActions').innerHTML = '';
     return;
   }
