@@ -167,9 +167,9 @@ function buildReadableDocx(finalUnits, titleLine, subtitleLine){
 function buildComparisonDocx(finalUnits, titleLine){
   const paras = [];
   paras.push(wpPara(titleLine, { center: true, bold: true, size: 36, spacingAfter: 80 }));
-  paras.push(wpPara('Editorial comparison — Original / Translation / Back Translation', { center: true, italic: true, color: '595959', size: 20, spacingAfter: 480 }));
+  paras.push(wpPara('Editorial comparison: Original / Translation / Back Translation', { center: true, italic: true, color: '595959', size: 20, spacingAfter: 480 }));
   finalUnits.forEach((u, idx) => {
-    paras.push(wpPara(`${u.id} — ${u.chapter}`, { bold: true, size: 24, spacingAfter: 160, pageBreak: idx > 0 }));
+    paras.push(wpPara(`${u.id}: ${u.chapter}`, { bold: true, size: 24, spacingAfter: 160, pageBreak: idx > 0 }));
     const section = (label, text) => {
       if(!text || !text.trim()) return;
       paras.push(wpPara(label, { bold: true, color: '802334', size: 18, spacingAfter: 40 }));

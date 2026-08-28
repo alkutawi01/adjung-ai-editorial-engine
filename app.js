@@ -268,7 +268,7 @@ function renderBookProfilePanel(){
   const fieldsHtml = BOOK_PROFILE_FIELDS.map(f => {
     const val = (bp.fields && bp.fields[f.key]) || '';
     const over = val.length > f.max;
-    const title = over ? `title="The chatbot ran a little long here. Not an error — shorter just keeps every field skimmable and consistent across the book. Edit the field if you want to trim it."` : '';
+    const title = over ? `title="The chatbot ran a little long here. Not an error, shorter just keeps every field skimmable and consistent across the book. Edit the field if you want to trim it."` : '';
     if(editingBpField === f.key){
       return `<div class="bp-field bp-field-editing">
         <div class="bp-field-head"><small>${escapeHtml(f.label)} (editing)</small></div>
@@ -289,7 +289,7 @@ function renderBookProfilePanel(){
     // no longer a list here for the editor to read and then go hunting for a matching button —
     // it's a coach mark pointing directly at Step A's Copy button (see renderScanCoachTip).
     $('bookProfileFields').innerHTML = `<div class="empty-state">
-      <p class="upload-success-line">✓ "${escapeHtml(doc.fileName)}" uploaded — ${doc.units.length} unit${doc.units.length === 1 ? '' : 's'} across ${currentChapters().length} section${currentChapters().length === 1 ? '' : 's'}.</p>
+      <p class="upload-success-line">✓ "${escapeHtml(doc.fileName)}" uploaded: ${doc.units.length} unit${doc.units.length === 1 ? '' : 's'} across ${currentChapters().length} section${currentChapters().length === 1 ? '' : 's'}.</p>
       <p>Follow Step A in the sidebar to get started.</p>
     </div>`;
     $('bookProfileActions').innerHTML = '';
@@ -340,7 +340,7 @@ function renderKeyTermsImport(){
   box.hidden = false;
   box.innerHTML = newTerms.length
     ? `<p class="hint-small">Key Terms recognised ${terms.length} term(s). Add the ${newTerms.length} not yet in Decision Memory as empty entries ready for you to fill in a ruling?</p>
-       <p class="hint-small">Creates ${newTerms.length} draft Decision Memory entr${newTerms.length === 1 ? 'y' : 'ies'} with no ruling — none of them affects a prompt until you write and save a ruling for it. Nothing is auto-accepted.</p>
+       <p class="hint-small">Creates ${newTerms.length} draft Decision Memory entr${newTerms.length === 1 ? 'y' : 'ies'} with no ruling. None of them affects a prompt until you write and save a ruling for it. Nothing is auto-accepted.</p>
        <button class="text-button" id="bpImportTerms">+ Add ${newTerms.length} term(s) to Decision Memory</button>`
     : `<p class="hint-small">All ${terms.length} Key Terms already have a Decision Memory entry.</p>`;
   if($('bpImportTerms')) $('bpImportTerms').onclick = () => {
@@ -393,7 +393,7 @@ $('guideImportInput').onchange = async (e) => {
     });
     save();
     renderAll();
-    $('guideImportMsg').textContent = `✓ Imported from "${parsed.sourceBook || file.name}" — review and approve below. ${added} Decision Memory ruling(s) carried over.`;
+    $('guideImportMsg').textContent = `✓ Imported from "${parsed.sourceBook || file.name}". Review and approve below. ${added} Decision Memory ruling(s) carried over.`;
   }catch(err){
     $('guideImportMsg').textContent = 'Import failed: ' + err.message;
   }
@@ -443,7 +443,7 @@ function renderDecisionMemory(){
   // the rulings they need are already there.
   const names = ruled.length <= 6 ? ruled.map(e => e.term).join(', ') : `${ruled.slice(0, 5).map(e => e.term).join(', ')} +${ruled.length - 5} more`;
   $('dmSummaryLine').textContent = !doc.decisionMemory.length
-    ? '0 rulings — add or review before processing, especially names and religious/technical terms.'
+    ? '0 rulings. Add or review before processing, especially names and religious/technical terms.'
     : !ruled.length ? `${empty} term(s) waiting for a ruling`
     : empty ? `${ruled.length} ruling(s) saved (${names}) · ${empty} term(s) still need one` : `${ruled.length} ruling(s) saved: ${names}`;
   const list = $('dmList');
@@ -475,7 +475,7 @@ function renderDecisionMemory(){
       </div>` : '';
     return `<div class="dm-entry">
       <div class="dm-entry-head"><span class="dm-entry-term" dir="auto">${escapeHtml(e.term)}${e.category ? `<span class="dm-category-tag">${escapeHtml(e.category)}</span>` : ''}</span><span class="dm-entry-actions"><button class="dm-remove" data-dmedit="${escapeHtml(e.id)}">Edit</button><button class="dm-remove" data-dmremove="${escapeHtml(e.id)}">Remove</button></span></div>
-      <p class="dm-entry-decision${empty ? ' dm-entry-empty' : ''}" dir="auto">${e.decision ? escapeHtml(e.decision) : 'No ruling yet — click Edit to add one. Until then this term is not sent to the chatbot.'}</p>
+      <p class="dm-entry-decision${empty ? ' dm-entry-empty' : ''}" dir="auto">${e.decision ? escapeHtml(e.decision) : 'No ruling yet. Click Edit to add one. Until then this term is not sent to the chatbot.'}</p>
       ${suggestionHtml}
     </div>`;
   }).join('');
@@ -502,7 +502,7 @@ function renderDmSuggestPrompt(){
   const bp = doc?.bookProfile;
   const context = bp?.status === 'approved' && bp.fields
     ? BOOK_PROFILE_FIELDS.filter(f => bp.fields[f.key]).map(f => `${f.label}: ${bp.fields[f.key]}`).join('\n')
-    : '(No approved Translation Guide yet — suggest based on the term itself.)';
+    : '(No approved Translation Guide yet. Suggest based on the term itself.)';
   out.value = `YOU ARE: An editorial assistant proposing terminology rulings for a translation project, based on context already gathered about this book. You are NOT deciding anything — a human editor will accept or reject each suggestion.
 
 BOOK CONTEXT:
@@ -830,7 +830,7 @@ function renderPhaseNav(){
   // be a lie the moment an earlier stage invalidates this one, so stale takes priority over it.
   const badge = (el, name, approved, pending, staleCount) => {
     const locked = phaseLocked(name);
-    $(el).textContent = locked ? '🔒 Locked' : staleCount ? `${staleCount} stale — rerun` : pending ? `${pending} to review` : approved ? `${approved} done` : '';
+    $(el).textContent = locked ? '🔒 Locked' : staleCount ? `${staleCount} stale, rerun` : pending ? `${pending} to review` : approved ? `${approved} done` : '';
     $(el).className = 'phase-badge' + (locked ? ' locked' : staleCount ? ' stale' : pending ? ' pending' : approved ? ' done' : '');
   };
   $('badgeScan').textContent = doc?.bookProfile?.status === 'approved' ? 'done' : doc?.bookProfile?.status === 'pending' ? 'to review' : '';
@@ -902,7 +902,7 @@ function renderStatusFilterOptions(){
     options = [['', 'All'], ['ready', 'Ready for final review'], ['final', 'Marked FINAL'], ['stale', 'Incomplete / needs rerun']];
   } else {
     const noneLabel = { parafrasa: 'No paraphrase yet', translation: 'No translation yet', backtranslation: 'No back translation yet' }[mode];
-    options = [['', 'All statuses'], ['none', noneLabel], ['sent', 'Sent — awaiting reply'], ['pending', 'Awaiting review'], ['approved', 'Approved'], ['stale', 'Stale — rerun needed'], ['rejected', 'Rejected']];
+    options = [['', 'All statuses'], ['none', noneLabel], ['sent', 'Sent, awaiting reply'], ['pending', 'Awaiting review'], ['approved', 'Approved'], ['stale', 'Stale, rerun needed'], ['rejected', 'Rejected']];
   }
   sel.innerHTML = options.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
   if(options.some(([v]) => v === current)) sel.value = current;
@@ -952,8 +952,8 @@ function emptyStateMessage(){
   if(phase === 'final'){
     const f = $('statusFilter').value;
     if(f === 'final') return 'No units marked FINAL yet.';
-    if(f === 'stale') return 'Nothing incomplete right now — no unit needs a rerun.';
-    if(f === 'ready') return 'Nothing ready to mark FINAL — every reviewable unit is already FINAL, or none have an approved back translation yet.';
+    if(f === 'stale') return 'Nothing incomplete right now. No unit needs a rerun.';
+    if(f === 'ready') return 'Nothing ready to mark FINAL. Every reviewable unit is already FINAL, or none have an approved back translation yet.';
     return 'No units have an approved back translation yet.';
   }
   const statusF = $('statusFilter').value;
@@ -995,7 +995,7 @@ function computeFinalWarnings(u){
     const relevantTerms = relevantDecisionMemory(u.source);
     relevantTerms.forEach(e => {
       if(!termAppearsIn(transText, e.term) && !termAppearsIn(backText, e.term)){
-        warnings.push(`Decision Memory term "${e.term}" (ruling: "${e.decision}") is in the original but doesn't turn up in the Translation or Back Translation — worth checking it was applied.`);
+        warnings.push(`Decision Memory term "${e.term}" (ruling: "${e.decision}") is in the original but doesn't turn up in the Translation or Back Translation. Worth checking it was applied.`);
       }
     });
   }
@@ -1130,7 +1130,7 @@ function renderUnitList(){
   const units = singleCardMode ? [allUnits[singleCardIndex]] : allUnits;
   $('singleCardNav').hidden = !singleCardMode;
   if(singleCardMode){
-    $('singleCardPos').textContent = `${singleCardIndex + 1} / ${allUnits.length} — ${allUnits[singleCardIndex].id}`;
+    $('singleCardPos').textContent = `${singleCardIndex + 1} / ${allUnits.length} · ${allUnits[singleCardIndex].id}`;
     $('singleCardPrev').disabled = singleCardIndex === 0;
     $('singleCardNext').disabled = singleCardIndex === allUnits.length - 1;
   }
@@ -1143,7 +1143,7 @@ function renderUnitList(){
       const isStale = u.backTranslation.status === 'stale';
       const showingDiff = diffShownIds.has(u.id);
       const diffBlock = showingDiff
-        ? `<div class="unit-field diff-field"><small>DIFFERENCES — ORIGINAL → BACK TRANSLATION</small><p dir="auto">${renderDiffHtml(u.source, u.backTranslation.text)}</p></div>`
+        ? `<div class="unit-field diff-field"><small>DIFFERENCES: ORIGINAL → BACK TRANSLATION</small><p dir="auto">${renderDiffHtml(u.source, u.backTranslation.text)}</p></div>`
         : '';
       html += `<div class="unit-card">
         <div class="unit-card-head"><b>${escapeHtml(u.id)}</b>${u.final ? '<span class="unit-status approved">FINAL</span>' : isStale ? '<span class="unit-status stale">Needs rerun</span>' : '<span class="unit-status pending">Not final</span>'}</div>
@@ -1151,7 +1151,7 @@ function renderUnitList(){
         ${finalFieldBlock(u, 'parafrasa')}
         ${finalFieldBlock(u, 'translation')}
         ${isStale
-          ? `<p class="stale-banner">⚠ Back Translation is stale — it no longer matches the current Translation. <button class="text-button" data-gotobt="${escapeHtml(u.id)}">Go rerun it →</button></p>`
+          ? `<p class="stale-banner">⚠ Back Translation is stale. It no longer matches the current Translation. <button class="text-button" data-gotobt="${escapeHtml(u.id)}">Go rerun it →</button></p>`
           : `${finalFieldBlock(u, 'backTranslation')}
              <button class="text-button" data-togglediff="${escapeHtml(u.id)}">${showingDiff ? '✕ Hide differences' : '🔍 Show differences (Original ↔ Back Translation)'}</button>
              ${diffBlock}
@@ -1185,8 +1185,8 @@ function renderUnitList(){
       </div>
       ${fieldBlock('ORIGINAL TEXT', u.source, '', 'original')}
       ${refLabel ? fieldBlock(refLabel, refText, 'reference', mode === 'translation' ? 'parafrasa' : 'translation') : ''}
-      ${w.status === 'stale' ? `<p class="stale-banner">⚠ ${statusLabel('stale')} — the text below is outdated. Pick this unit above to send it again.</p>` : ''}
-      ${w.grade === 'C' ? `<p class="grade-c-banner">⚠ Chatbot flagged low confidence on this ${label.toLowerCase()} — worth a closer read.</p>` : ''}
+      ${w.status === 'stale' ? `<p class="stale-banner">⚠ ${statusLabel('stale')}. The text below is outdated. Pick this unit above to send it again.</p>` : ''}
+      ${w.grade === 'C' ? `<p class="grade-c-banner">⚠ Chatbot flagged low confidence on this ${label.toLowerCase()}, worth a closer read.</p>` : ''}
       ${editingUnitId === u.id
         ? `<div class="unit-field kind-${mode}"><small>${label} (editing)</small><textarea class="edit-textarea" id="editTextarea" dir="auto">${escapeHtml(w.text)}</textarea></div>
            <div class="unit-actions"><button class="text-button" data-canceledit="${escapeHtml(u.id)}">Cancel</button><button class="approve-button" data-saveedit="${escapeHtml(u.id)}">✓ Save</button></div>`
@@ -1204,8 +1204,8 @@ function renderUnitList(){
 
 function statusLabel(s){
   const noneLabel = { parafrasa: 'No paraphrase yet', translation: 'No translation yet', backtranslation: 'No back translation yet' }[mode];
-  const staleLabel = { parafrasa: 'Stale — earlier text changed, rerun needed', translation: 'Stale — earlier text changed, rerun needed', backtranslation: 'Stale — Translation changed, rerun needed' }[mode];
-  return { none: noneLabel, sent: 'Sent — awaiting reply', pending: 'Awaiting review', approved: 'Approved', rejected: 'Rejected', stale: staleLabel }[s] || s;
+  const staleLabel = { parafrasa: 'Stale, earlier text changed, rerun needed', translation: 'Stale, earlier text changed, rerun needed', backtranslation: 'Stale, Translation changed, rerun needed' }[mode];
+  return { none: noneLabel, sent: 'Sent, awaiting reply', pending: 'Awaiting review', approved: 'Approved', rejected: 'Rejected', stale: staleLabel }[s] || s;
 }
 
 // A prompt can be copied and handed to a chatbot without the app ever knowing whether that
@@ -1227,7 +1227,7 @@ function renderSentBanner(){
   if(!sentUnits.length){ $('sentBannerSection').hidden = true; return; }
   $('sentBannerSection').hidden = false;
   const oldest = sentUnits.reduce((a, b) => new Date(workField(a).sentAt) < new Date(workField(b).sentAt) ? a : b);
-  $('sentBanner').textContent = `⏳ ${sentUnits.length} unit(s) sent (${sentUnits.map(u => u.id).join(', ')}) — oldest ${minutesAgo(workField(oldest).sentAt)}, no reply processed yet. Don't resend unless the send genuinely failed.`;
+  $('sentBanner').textContent = `⏳ ${sentUnits.length} unit(s) sent (${sentUnits.map(u => u.id).join(', ')}), oldest ${minutesAgo(workField(oldest).sentAt)}, no reply processed yet. Don't resend unless the send genuinely failed.`;
 }
 $('clearSentBtn').onclick = () => {
   (doc?.units || []).forEach(u => { if(workField(u).status === 'sent'){ workField(u).status = 'none'; workField(u).sentAt = null; } });
@@ -1403,7 +1403,7 @@ function renderBatchAccordion(){
   $('stepASummary').textContent = sel.length ? `${sel.length} unit(s) picked`
     : pendingCount || sentCount ? `${pendingCount} awaiting review · ${sentCount} sent` : 'Nothing picked yet';
   $('stepBSummary').textContent = sel.length ? `Prompt ready for ${sel.length} unit(s)`
-    : sentCount ? 'Sent — waiting for a reply' : 'Pick units first';
+    : sentCount ? 'Sent, waiting for a reply' : 'Pick units first';
   $('stepCSummary').textContent = sentCount ? `${sentCount} unit(s) sent, waiting for a reply`
     : pendingCount ? `${pendingCount} unit(s) awaiting your review` : 'Nothing to paste yet';
 }
@@ -1465,7 +1465,7 @@ function renderAll(){
     $('bookScanPromptOut').value = bookScanPromptText();
     $('targetLangInputScan').value = doc.targetLang || '';
     const targetSet = (doc.targetLang || '').trim();
-    $('targetLangScanStatus').textContent = targetSet ? `✓ Set: ${doc.targetLang}` : 'Not set — optional for now, required before Translation unlocks.';
+    $('targetLangScanStatus').textContent = targetSet ? `✓ Set: ${doc.targetLang}` : 'Not set. Optional for now, required before Translation unlocks.';
     $('targetLangScanStatus').className = 'hint-small target-lang-status' + (targetSet ? ' set' : '');
     // The copy/paste controls that built this profile are one-time setup — once approved, they
     // no longer need to dominate the screen above the profile they produced. A collapsed bar
@@ -1486,7 +1486,7 @@ function renderAll(){
     // mirror-back isn't the place to apply terminology rulings. Without saying so, the missing
     // panels read as something broken rather than something deliberate.
     $('backtranslationInfo').hidden = mode !== 'backtranslation';
-    if(mode === 'backtranslation') $('backtranslationInfo').innerHTML = `Back-translating into: <b>${escapeHtml(doc.sourceLang || '(source language not set)')}</b><br>Literal comparison mode — Decision Memory is intentionally not applied.`;
+    if(mode === 'backtranslation') $('backtranslationInfo').innerHTML = `Back-translating into: <b>${escapeHtml(doc.sourceLang || '(source language not set)')}</b><br>Literal comparison mode. Decision Memory is intentionally not applied.`;
     $('sourceLangInput').value = doc.sourceLang || '';
     $('targetLangInput').value = doc.targetLang || '';
     $('targetLangInputScan').value = doc.targetLang || '';
@@ -1558,7 +1558,7 @@ function renderSourceLangSuggest(){
   const current = (doc.sourceLang || '').trim();
   if(!detected || detected.toLowerCase() === current.toLowerCase()){ box.hidden = true; return; }
   box.hidden = false;
-  box.innerHTML = `Detected from ${sample.length ? 'the selected units' : "this book's opening"}: <b>${escapeHtml(detected)}</b><button id="applyLangSuggest">Use ${escapeHtml(detected)}</button><span class="lang-suggest-note">This is only a suggestion — it won't fill the field on its own. You can set a different language for this batch.</span>`;
+  box.innerHTML = `Detected from ${sample.length ? 'the selected units' : "this book's opening"}: <b>${escapeHtml(detected)}</b><button id="applyLangSuggest">Use ${escapeHtml(detected)}</button><span class="lang-suggest-note">This is only a suggestion. It won't fill the field on its own. You can set a different language for this batch.</span>`;
   $('applyLangSuggest').onclick = () => {
     doc.sourceLang = detected; $('sourceLangInput').value = detected; save(); box.hidden = true; renderPrompt();
   };
@@ -1582,7 +1582,7 @@ $('selectAllBtn').onclick = () => {
   // Naming the actual outcome (not just the cap being hit) means the editor never has to
   // recount the checkboxes themselves to know what a click just did.
   $('batchWarning').textContent = skipped
-    ? `All filtered selected up to the batch limit (${BATCH_MAX_CHARS} chars / ${BATCH_MAX_SENTENCES} sentences): ${picked} unit(s) selected, ${skipped} left over — process this batch, then run it again.`
+    ? `All filtered selected up to the batch limit (${BATCH_MAX_CHARS} chars / ${BATCH_MAX_SENTENCES} sentences): ${picked} unit(s) selected, ${skipped} left over. Process this batch, then run it again.`
     : `All filtered selected: ${picked} unit(s).`;
   renderUnitList(); renderPrompt(); renderSourceLangSuggest();
 };
@@ -1606,7 +1606,7 @@ $('suggestBatchBtn').onclick = () => {
   }
   $('batchWarning').textContent = picked
     ? `Suggested batch selected: ${picked} next unit(s) not yet started.`
-    : 'No unstarted units left to suggest — everything filtered is already sent, pending, or approved.';
+    : 'No unstarted units left to suggest. Everything filtered is already sent, pending, or approved.';
   renderUnitList(); renderPrompt(); renderSourceLangSuggest();
 };
 
@@ -1648,7 +1648,7 @@ function renderPilotBanner(){
   const show = !doc.pilotConfirmed && !pilotBannerDismissed && approvedCount >= 1 && approvedCount <= PILOT_BATCH_UNITS + 1 && doc.units.length > PILOT_BATCH_UNITS;
   section.hidden = !show;
   if(!show) return;
-  $('pilotBannerText').textContent = `🧪 ${approvedCount} unit(s) have gone all the way through Paraphrase → Translation → Back Translation. Read them over — is the voice, terminology and register right? Confirm before picking more units for the rest of the book.`;
+  $('pilotBannerText').textContent = `🧪 ${approvedCount} unit(s) have gone all the way through Paraphrase → Translation → Back Translation. Read them over: is the voice, terminology and register right? Confirm before picking more units for the rest of the book.`;
 }
 $('pilotConfirmBtn').onclick = () => { doc.pilotConfirmed = true; save(); renderPilotBanner(); };
 $('pilotRefineBtn').onclick = () => { pilotBannerDismissed = true; renderPilotBanner(); };
@@ -1766,8 +1766,8 @@ $('unitList').addEventListener('click', e => {
       const stagesOnly = invalidated.filter(x => x !== 'FINAL');
       if(invalidated.length){
         $('finalEditNotice').textContent = stagesOnly.length
-          ? `${id}: ${stagesOnly.join(' and ')} now stale, FINAL removed — rerun the stale stage(s) before this unit returns to Final Review.`
-          : `${id}: FINAL removed — review this unit again before export.`;
+          ? `${id}: ${stagesOnly.join(' and ')} now stale, FINAL removed. Rerun the stale stage(s) before this unit returns to Final Review.`
+          : `${id}: FINAL removed. Review this unit again before export.`;
         setTimeout(() => { $('finalEditNotice').textContent = ''; }, 8000);
       }
     }
@@ -1839,11 +1839,11 @@ $('exportDocBtn').onclick = () => {
   if(!finalUnits.length){ $('exportDocMsg').textContent = 'No FINAL units to export yet.'; return; }
   const missingTranslation = finalUnits.filter(u => !u.translation.text?.trim());
   if(missingTranslation.length){
-    $('exportDocMsg').textContent = `${missingTranslation.length} FINAL unit(s) have no translation text — export stopped so nothing is silently blank.`;
+    $('exportDocMsg').textContent = `${missingTranslation.length} FINAL unit(s) have no translation text. Export stopped so nothing is silently blank.`;
     return;
   }
   const titleLine = doc.fileName.replace(/\.docx$/i, '');
-  const subtitleLine = `${doc.targetLang || 'Translation'} — exported ${new Date().toLocaleDateString()}`;
+  const subtitleLine = `${doc.targetLang || 'Translation'}, exported ${new Date().toLocaleDateString()}`;
   downloadBlob(buildReadableDocx(finalUnits, titleLine, subtitleLine), `${titleLine} - ${doc.targetLang || 'Translation'}.docx`);
   $('exportDocMsg').textContent = `✓ Document downloaded (${finalUnits.length} unit(s)).`;
   setTimeout(() => { $('exportDocMsg').textContent = ''; }, 4000);
@@ -1966,14 +1966,14 @@ $('pasteIn').addEventListener('input', () => {
   const found = Object.keys(chunks).length;
   const targetField = PHASES[mode].field;
   const outstanding = doc.units.filter(u => u[targetField].status === 'sent').length;
-  if(!found){ el.textContent = '⚠ No [UNIT: id] markers detected yet — check the reply kept the requested format.'; el.className = 'hint-small paste-status warn'; return; }
+  if(!found){ el.textContent = '⚠ No [UNIT: id] markers detected yet. Check the reply kept the requested format.'; el.className = 'hint-small paste-status warn'; return; }
   if(outstanding && found < outstanding){
     const missingIds = doc.units.filter(u => u[targetField].status === 'sent' && !chunks[u.id]).map(u => u.id);
-    el.textContent = `⚠ ${found} of ${outstanding} sent unit(s) detected — missing ${missingIds.join(', ') || 'some units'}. Looks incomplete.`;
+    el.textContent = `⚠ ${found} of ${outstanding} sent unit(s) detected, missing ${missingIds.join(', ') || 'some units'}. Looks incomplete.`;
     el.className = 'hint-small paste-status warn';
     return;
   }
-  el.textContent = found === 1 ? '✓ 1 unit detected. Structure is valid — review the content before saving.' : `✓ ${found} units detected. Structure is valid — review the content before saving.`;
+  el.textContent = found === 1 ? '✓ 1 unit detected. Structure is valid, review the content before saving.' : `✓ ${found} units detected. Structure is valid, review the content before saving.`;
   el.className = 'hint-small paste-status ok';
 });
 
@@ -1997,7 +1997,7 @@ $('processBtn').onclick = () => {
     });
     if(answered.length < outstanding.length){
       const missing = outstanding.filter(u => !answered.includes(u)).map(u => u.id);
-      $('parseError').textContent = `Incomplete reply: ${answered.length} of ${outstanding.length} sent unit(s) answered. Missing ${missing.join(', ')}. The chatbot likely cut out — send the batch again rather than accepting a partial answer. Nothing was saved.`;
+      $('parseError').textContent = `Incomplete reply: ${answered.length} of ${outstanding.length} sent unit(s) answered. Missing ${missing.join(', ')}. The chatbot likely cut out; send the batch again rather than accepting a partial answer. Nothing was saved.`;
       return;
     }
   }
@@ -2024,7 +2024,7 @@ $('processBtn').onclick = () => {
   renderAll();
   const approveLabel = { parafrasa: 'Approve paraphrase', translation: 'Approve translation', backtranslation: 'Approve back translation' }[mode];
   const fieldNoun = { parafrasa: 'paraphrase', translation: 'translation', backtranslation: 'back translation' }[mode];
-  $('parseSuccess').textContent = `✓ ${applied} ${fieldNoun}${applied === 1 ? '' : 's'} saved — now awaiting review. Use "${approveLabel}" or "Reject" on each card below.`
+  $('parseSuccess').textContent = `✓ ${applied} ${fieldNoun}${applied === 1 ? '' : 's'} saved, now awaiting review. Use "${approveLabel}" or "Reject" on each card below.`
     + (unknown.length ? ` Ignored unknown id(s): ${unknown.join(', ')}.` : '');
   setTimeout(() => { $('parseSuccess').textContent = ''; }, 8000);
   // Collapsing the accordion and re-filtering the list can leave the unit that was just saved

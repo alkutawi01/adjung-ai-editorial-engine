@@ -12,20 +12,20 @@
   <div class="mobile-block-card">
     <p class="brand-word">Adjung</p>
     <h1>Desktop only</h1>
-    <p>Adjung Translation Engine is built for editorial work at a desk — wide side-by-side review, long prompts, careful comparison across four text versions. It isn't usable on a phone screen and doesn't try to be.</p>
+    <p>Adjung Translation Engine is built for editorial work at a desk: wide side-by-side review, long prompts, careful comparison across four text versions. It isn't usable on a phone screen and doesn't try to be.</p>
     <p class="hint-small">Open this page on a laptop or desktop computer instead.</p>
   </div>
 </div>
 <div class="shell">
   <header class="topbar">
     <div class="brand"><span class="brand-word">Adjung</span><span class="brand-sub">TRANSLATION ENGINE</span></div>
-    <div class="topbar-right"><span id="savedState" class="saved" title="Your manuscript and all work stay in this browser's local storage — nothing is uploaded to any server. The only thing that ever leaves this browser is the text you yourself copy into a chatbot. Use Backup (sidebar, visible at every stage) to export everything to a file, or Restore to bring it back on another computer.">● Saved locally</span><span id="copyrightNotice" class="copyright"></span></div>
+    <div class="topbar-right"><span id="savedState" class="saved" title="Your manuscript and all work stay in this browser's local storage. Nothing is uploaded to any server. The only thing that ever leaves this browser is the text you yourself copy into a chatbot. Use Backup (sidebar, visible at every stage) to export everything to a file, or Restore to bring it back on another computer.">● Saved locally</span></div>
   </header>
 
   <section id="uploadScreen" class="upload-screen">
     <div class="upload-card">
       <h1>Upload manuscript (.docx)</h1>
-      <p class="hint">The manuscript is split into small units sized for a chatbot's attention span — roughly 220 to 650 characters, grouped by actual paragraph content rather than a fixed paragraph count, so a one-line reply doesn't become its own unit. Chapter headings mark section boundaries; footnotes are carried along with the passage they belong to.</p>
+      <p class="hint">The manuscript is split into small units sized for a chatbot's attention span, roughly 220 to 650 characters, grouped by actual paragraph content rather than a fixed paragraph count, so a one-line reply doesn't become its own unit. Chapter headings mark section boundaries; footnotes are carried along with the passage they belong to.</p>
       <div class="whats-next">
         <p class="whats-next-title">What happens next</p>
         <ol>
@@ -66,7 +66,7 @@
 
         <div class="sidebar-section">
           <h2>Backup</h2>
-          <p class="hint-small">Saves every book and all in-progress work, at any stage — not just after Final Review. Local storage can be lost if the browser is cleared or the device fails, so keep a copy outside the browser as you go.</p>
+          <p class="hint-small">Saves every book and all in-progress work, at any stage, not just after Final Review. Local storage can be lost if the browser is cleared or the device fails, so keep a copy outside the browser as you go.</p>
           <button class="copy-button" id="backupBtn">⬇ Download full backup</button>
           <input type="file" id="restoreInput" accept=".json" hidden>
           <button class="text-button" id="restoreBtn">Restore from backup…</button>
@@ -78,17 +78,17 @@
             <p class="scan-complete-bar">✓ Translation Guide complete <button class="text-button" id="bpReopenFromBar">Reopen for review</button></p>
           </div>
           <div id="bookScanSteps">
-            <p class="phase-intro">Send the whole book to your chatbot once, so it can describe the voice, style and risky terms before any unit work begins. This becomes the book's <b>Translation Guide</b> — approved once, then referenced automatically by every later phase.</p>
+            <p class="phase-intro">Send the whole book to your chatbot once, so it can describe the voice, style and risky terms before any unit work begins. This becomes the book's <b>Translation Guide</b>, approved once, then referenced automatically by every later phase.</p>
             <div class="sidebar-section" id="translationGuideImport">
               <h2>Reuse a Translation Guide</h2>
-              <p class="hint-small">Starting the next book in a series? Import a Guide exported from an earlier book to carry over its voice, terminology, and rulings — you'll still review and approve it before it applies here.</p>
+              <p class="hint-small">Starting the next book in a series? Import a Guide exported from an earlier book to carry over its voice, terminology, and rulings. You'll still review and approve it before it applies here.</p>
               <input type="file" id="guideImportInput" accept=".json" hidden>
               <button class="text-button" id="guideImportBtn">Import Translation Guide…</button>
               <p id="guideImportMsg" class="hint-small backup-status"></p>
             </div>
             <div class="sidebar-section" id="targetLangScanSection">
               <h2>Target language</h2>
-              <p class="hint-small">Set this now if you already know it — it carries through to the Translation phase and can still be changed later.</p>
+              <p class="hint-small">Set this now if you already know it. It carries through to the Translation phase and can still be changed later.</p>
               <input type="text" id="targetLangInputScan" placeholder="e.g. English, Arabic…">
               <p id="targetLangScanStatus" class="hint-small target-lang-status"></p>
             </div>
@@ -99,7 +99,7 @@
               <button class="copy-button" id="copyBookScanBtn">▣ Copy prompt</button>
               <div id="scanCoachTip" class="coach-tip" hidden>
                 <span class="coach-tip-arrow"></span>
-                <p>👋 Start here — copy this, then send it to your chatbot together with the .docx file you just uploaded.</p>
+                <p>👋 Start here: copy this, then send it to your chatbot together with the .docx file you just uploaded.</p>
                 <button class="text-button" id="scanCoachTipDismiss">Got it</button>
               </div>
             </div>
@@ -117,7 +117,7 @@
           <p id="backtranslationInfo" class="hint-small backtranslation-info" hidden></p>
           <div class="sidebar-section" id="sourceLangSection" hidden>
             <h2>Manuscript's source language <span class="required-mark">required</span></h2>
-            <p class="hint-small">This is what the paraphrase prompt tells the chatbot to write in — a manuscript with more than one language can have this changed per batch.</p>
+            <p class="hint-small">This is what the paraphrase prompt tells the chatbot to write in. A manuscript with more than one language can have this changed per batch.</p>
             <input type="text" id="sourceLangInput" placeholder="e.g. Malay, English…">
             <div id="sourceLangSuggest" class="lang-suggest" hidden></div>
           </div>
@@ -127,7 +127,7 @@
           </div>
           <details class="sidebar-section step-section" id="decisionMemorySection">
             <summary><span class="chevron" aria-hidden="true">▸</span><h2>Decision Memory <span id="dmCount" class="unit-status none">0</span></h2><p id="dmSummaryLine" class="hint-small dm-summary-line"></p></summary>
-            <p class="hint-small">The terminology half of this book's Translation Guide — names, religious terms, transliteration, house style. Only entries whose term appears in the selected units are added to the prompt. Included when you export the Guide from Book Scan.</p>
+            <p class="hint-small">The terminology half of this book's Translation Guide: names, religious terms, transliteration, house style. Only entries whose term appears in the selected units are added to the prompt. Included when you export the Guide from Book Scan.</p>
             <div class="dm-add-row">
               <input type="text" id="dmTermInput" placeholder="Term (e.g. tawaqquf)">
               <textarea id="dmDecisionInput" class="dm-decision-input" placeholder="Ruling (e.g. keep the Arabic term, never translate it)" rows="2"></textarea>
@@ -164,7 +164,7 @@
             <p id="dmIoMsg" class="hint-small backup-status"></p>
             <details class="step-section dm-suggest-section" id="dmSuggestSection">
               <summary><span class="chevron" aria-hidden="true">▸</span><h2>Suggest rulings via chatbot</h2></summary>
-              <p class="hint-small">For terms with no ruling yet, ask a chatbot to propose one from the Translation Guide context — you still Accept or Reject each suggestion.</p>
+              <p class="hint-small">For terms with no ruling yet, ask a chatbot to propose one from the Translation Guide context. You still Accept or Reject each suggestion.</p>
               <textarea id="dmSuggestPromptOut" class="prompt-out dm-suggest-prompt" readonly></textarea>
               <button class="copy-button" id="dmCopySuggestBtn">▣ Copy prompt</button>
               <textarea id="dmSuggestPasteIn" class="paste-in" placeholder="Paste the chatbot's suggestions here…"></textarea>
@@ -181,7 +181,7 @@
             <p id="pilotBannerText" class="hint-small"></p>
             <div class="unit-actions">
               <button class="text-button" id="pilotRefineBtn">Refine Guide first</button>
-              <button class="approve-button" id="pilotConfirmBtn">✓ Confirm — use for the rest of the book</button>
+              <button class="approve-button" id="pilotConfirmBtn">✓ Confirm and use for the rest of the book</button>
             </div>
           </div>
 
@@ -198,7 +198,7 @@
               <button class="text-button" id="pilotBatchBtn">🧪 Pilot (2 units)</button>
               <button class="text-button" id="selectNoneBtn">Clear</button>
             </div>
-            <p class="hint-small">Limits exist because a chatbot's reply can cut out mid-batch on very long prompts, and a smaller batch is easier to review carefully. "Suggested batch" adds up to 5 more not-yet-started units, good for one comfortable review pass; "Select all filtered" fills up to the hard limit below in one go. New book? Run "Pilot" through all three phases first — confirm the Translation Guide fits before committing the rest of the book to it.</p>
+            <p class="hint-small">Limits exist because a chatbot's reply can cut out mid-batch on very long prompts, and a smaller batch is easier to review carefully. "Suggested batch" adds up to 5 more not-yet-started units, good for one comfortable review pass; "Select all filtered" fills up to the hard limit below in one go. New book? Run "Pilot" through all three phases first, then confirm the Translation Guide fits before committing the rest of the book to it.</p>
             <p id="selectedCount" class="selected-count">0 selected</p>
             <p id="batchWarning" class="batch-warning" role="status"></p>
           </details>
@@ -210,7 +210,7 @@
           </details>
           <details class="sidebar-section step-section batch-step" id="stepC">
             <summary><span class="chevron" aria-hidden="true">▸</span><h2>Step C · Paste the reply</h2><p id="stepCSummary" class="hint-small step-summary-line"></p></summary>
-            <p class="hint-small">Status goes Sent → Awaiting review → Approved as you copy, then paste, then approve. If a copy failed or was never actually sent, a "Clear sent status" option appears above (next to the unit list) once anything is marked Sent — use it to unstick that unit and pick it again.</p>
+            <p class="hint-small">Status goes Sent → Awaiting review → Approved as you copy, then paste, then approve. If a copy failed or was never actually sent, a "Clear sent status" option appears above (next to the unit list) once anything is marked Sent. Use it to unstick that unit and pick it again.</p>
             <textarea id="pasteIn" class="paste-in" placeholder="Paste the chatbot's full reply here…"></textarea>
             <p id="pasteInStatus" class="hint-small paste-status"></p>
             <button class="primary-button" id="processBtn">Process &amp; Save →</button>
@@ -228,7 +228,7 @@
             <button class="primary-button" id="exportDocBtn">⬇ Export readable manuscript (.docx)</button>
             <button class="primary-button" id="exportComparisonBtn">⬇ Export editorial comparison (.docx)</button>
             <button class="copy-button" id="exportBtn">⬇ Export FINAL units (.json)</button>
-            <p class="hint-small">"Editorial comparison" lays out Original, Translation, Back Translation and notes side by side per unit — for a proofreader or second editor, not for publishing.</p>
+            <p class="hint-small">"Editorial comparison" lays out Original, Translation, Back Translation and notes side by side per unit, for a proofreader or second editor, not for publishing.</p>
             <p id="exportDocMsg" class="parse-success" role="status"></p>
           </div>
         </div>
@@ -240,7 +240,7 @@
           <div class="filter-row" id="filterRow">
             <select id="statusFilter" aria-label="Filter by status"></select>
             <select id="chapterFilter" aria-label="Filter by section"><option value="">All sections</option></select>
-            <label class="single-card-toggle" title="Show one unit per screen instead of a scrolling list — slower to review, but each reply is smaller so there's less for a chatbot to get wrong."><input type="checkbox" id="singleCardToggle"> Process one unit at a time</label>
+            <label class="single-card-toggle" title="Show one unit per screen instead of a scrolling list. Slower to review, but each reply is smaller so there's less for a chatbot to get wrong."><input type="checkbox" id="singleCardToggle"> Process one unit at a time</label>
           </div>
         </div>
         <div id="bookProfilePanel" hidden>
@@ -258,6 +258,7 @@
     </div>
   </div>
 </div>
+<span id="copyrightNotice" class="copyright"></span>
 <script src="./docx-reader.js"></script>
 <script src="./docx-writer.js"></script>
 <script src="./app.js"></script>
