@@ -68,8 +68,15 @@
           <h2>Backup <span class="optional-tag">optional, anytime</span></h2>
           <p class="hint-small">Not a required step. Saves every book and all in-progress work, whenever you click it, not just after Final Review. Local storage can be lost if the browser is cleared or the device fails, so keep a copy outside the browser every so often.</p>
           <button class="copy-button" id="backupBtn">⬇ Download full backup</button>
+          <button class="text-button" id="gdocBackupBtn">📄 Backup via Google Doc…</button>
           <input type="file" id="restoreInput" accept=".json" hidden>
-          <button class="text-button" id="restoreBtn">Restore from backup…</button>
+          <button class="text-button" id="restoreBtn">Restore from backup file…</button>
+          <button class="text-button" id="restorePasteToggleBtn">Restore from pasted text…</button>
+          <div id="restorePasteBox" class="restore-paste-box" hidden>
+            <p class="hint-small">Paste backup text here (e.g. copied from a Google Doc you backed up into).</p>
+            <textarea id="restorePasteInput" class="paste-in" rows="4" placeholder="Paste backup JSON here…"></textarea>
+            <button class="primary-button" id="restorePasteBtn">Restore from pasted text</button>
+          </div>
           <p id="backupMsg" class="hint-small backup-status"></p>
         </div>
 

@@ -1878,32 +1878,73 @@ $('backupBtn').onclick = () => {
   localStorage.setItem(LIB_KEY, JSON.stringify(library));
   renderBackupStatus();
 };
+// Shared by both restore paths (file upload and pasted text) so a backup saved via Google Doc
+// (copy → paste into a new Doc, Google auto-saves it from there) has an equally safe way back in
+// as a downloaded .json file — without this, "backup via Doc" would be a one-way trip with no
+// matching restore, which defeats the point of it being a backup at all.
+function restoreLibraryFromJson(text, sourceLabel){
+  const parsed = JSON.parse(text);
+  if(!parsed || !parsed.books) throw new Error('Not an Adjung backup (no "books" found in the JSON).');
+  // This replaces every book currently in the browser, not just the active one. Without a
+  // confirmation, picking the wrong backup silently destroys everything in one click with no
+  // undo — the single most destructive action anywhere in the app deserves one.
+  const currentCount = Object.keys(library.books || {}).length;
+  const incomingCount = Object.keys(parsed.books).length;
+  const warning = currentCount
+    ? `Restoring will REPLACE all ${currentCount} book(s) currently in this browser with the ${incomingCount} book(s) in "${sourceLabel}". Anything not backed up separately will be lost. This cannot be undone.\n\nContinue?`
+    : `Restore ${incomingCount} book(s) from "${sourceLabel}"?`;
+  if(!confirm(warning)) return false;
+  library = parsed;
+  Object.values(library.books).forEach(normalizeDoc);
+  doc = library.activeFile ? library.books[library.activeFile] : Object.values(library.books)[0] || null;
+  save();
+  setPhase('scan');
+  renderAll();
+  $('backupMsg').textContent = `✓ Restored ${Object.keys(library.books).length} book(s).`;
+  return true;
+}
 $('restoreBtn').onclick = () => $('restoreInput').click();
 $('restoreInput').onchange = async (e) => {
   const file = e.target.files[0];
   if(!file) return;
+  try{ restoreLibraryFromJson(await file.text(), file.name); }
+  catch(err){ $('backupMsg').textContent = 'Restore failed: ' + err.message; }
+  $('restoreInput').value = '';
+};
+$('restorePasteToggleBtn').onclick = () => { $('restorePasteBox').hidden = !$('restorePasteBox').hidden; };
+$('restorePasteBtn').onclick = () => {
+  const text = $('restorePasteInput').value.trim();
+  if(!text){ $('backupMsg').textContent = 'Paste the backup text first.'; return; }
   try{
-    const parsed = JSON.parse(await file.text());
-    if(!parsed || !parsed.books) throw new Error('Not an Adjung backup file.');
-    // This replaces every book currently in the browser, not just the active one. Without a
-    // confirmation, picking the wrong backup file silently destroys everything in one click
-    // with no undo — the single most destructive action anywhere in the app deserves one.
-    const currentCount = Object.keys(library.books || {}).length;
-    const incomingCount = Object.keys(parsed.books).length;
-    const warning = currentCount
-      ? `Restoring will REPLACE all ${currentCount} book(s) currently in this browser with the ${incomingCount} book(s) in "${file.name}". Anything not backed up separately will be lost. This cannot be undone.\n\nContinue?`
-      : `Restore ${incomingCount} book(s) from "${file.name}"?`;
-    if(!confirm(warning)){ $('restoreInput').value = ''; return; }
-    library = parsed;
-    Object.values(library.books).forEach(normalizeDoc);
-    doc = library.activeFile ? library.books[library.activeFile] : Object.values(library.books)[0] || null;
-    save();
-    setPhase('scan');
-    renderAll();
-    $('backupMsg').textContent = `✓ Restored ${Object.keys(library.books).length} book(s).`;
+    if(restoreLibraryFromJson(text, 'pasted text')) $('restorePasteInput').value = '';
   }catch(err){
     $('backupMsg').textContent = 'Restore failed: ' + err.message;
   }
+};
+// No Drive API, no OAuth — just the same copy/paste idiom the rest of this app already uses for
+// chatbots. Opens a genuinely blank Google Doc (docs.google.com/create is Google's own shortcut
+// for this) and puts the full backup JSON on the clipboard so the editor only has to paste; the
+// Doc then lives in their own Drive under their own account, auto-saved by Google as normal.
+$('gdocBackupBtn').onclick = async () => {
+  const json = JSON.stringify(library, null, 2);
+  let copied = false;
+  try{ await navigator.clipboard.writeText(json); copied = true; }catch(e){ copied = false; }
+  if(!copied){
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = json; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      copied = document.execCommand('copy');
+      document.body.removeChild(ta);
+    }catch(e){ copied = false; }
+  }
+  library.lastBackupAt = new Date().toISOString();
+  localStorage.setItem(LIB_KEY, JSON.stringify(library));
+  renderBackupStatus();
+  window.open('https://docs.google.com/document/create', '_blank');
+  $('backupMsg').textContent = copied
+    ? '✓ Backup copied. A new Google Doc just opened, press Ctrl+V (Cmd+V on Mac) to paste it in.'
+    : '⚠ Could not copy automatically. A new Google Doc opened; copy the backup from "Download full backup" and paste it in manually.';
 };
 
 // ---- Copy & paste ------------------------------------------------------------
