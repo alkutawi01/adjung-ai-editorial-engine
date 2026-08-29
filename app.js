@@ -1114,6 +1114,7 @@ function finalFieldBlock(u, fieldKey){
       <div class="unit-actions"><button class="text-button" data-cancelfinaledit="1">Cancel</button><button class="approve-button" data-savefinaledit="${escapeHtml(u.id)}|${fieldKey}">✓ Save</button></div>`;
   }
   return `<div class="final-field-wrap">${fieldBlock(meta.label, text, meta.cls, meta.kind)}<button class="text-button edit-button final-edit-btn" data-editfinal="${escapeHtml(u.id)}|${fieldKey}">✎ Edit</button></div>
+    ${u[fieldKey].aiSource ? `<span class="ai-source-tag" title="Which chatbot produced this ${meta.label.toLowerCase()}">🤖 ${escapeHtml(u[fieldKey].aiSource)}</span>` : ''}
     ${renderClarifications(u.id, fieldKey, u[fieldKey].clarifications)}`;
 }
 
@@ -1181,6 +1182,7 @@ function renderUnitList(){
         <b>${escapeHtml(u.id)}</b>
         <span class="unit-status ${w.status}">${statusLabel(w.status)}</span>
         ${w.grade ? `<span class="grade-badge grade-${w.grade}" title="Chatbot's self-reported confidence in this ${label.toLowerCase()}">${w.grade}</span>` : ''}
+        ${w.aiSource ? `<span class="ai-source-tag" title="Which chatbot produced this ${label.toLowerCase()}">🤖 ${escapeHtml(w.aiSource)}</span>` : ''}
         ${u.final ? '<span class="unit-status approved">FINAL</span>' : ''}
       </div>
       ${fieldBlock('ORIGINAL TEXT', u.source, '', 'original')}
@@ -1276,6 +1278,13 @@ const CLARIFY_FORMAT_NOTE = `If — and only if — something is genuinely ambig
 // The grade doesn't have to drop for the editor to get the information that actually matters.
 const CONFIDENCE_GRADE_NOTE = `Also add a [CONFIDENCE] line with a single letter grade for your own work on this unit: A = fully confident, no reservations. B = reasonably confident, but a careful native reader might choose different wording or phrasing here. C = meaningfully uncertain about tone, register, or how well this rendering lands — flag it for closer human review. Grade honestly and use the full range — most units should not automatically be A. Regardless of grade, NOTES must never be left empty for this reason alone — even at grade A, name in one sentence the single hardest thing about this unit to render (a wordplay, a rhyme, a register, a cultural texture), so the editor sees your reasoning, not just a letter. If there is also a genuine [Q] to raise, add it after that sentence.`;
 
+// An editor working across several chatbots (comparing quality, or just using whichever is free
+// right now) has no way to tell afterward which unit came from which — self-reported, so it's a
+// convenience label, not an audit trail; the editor's own dropdown at Step C (see aiSourceOverride)
+// always wins over whatever the chatbot writes here, since the editor knows for certain and the
+// model is only guessing at its own identity.
+const AI_SOURCE_NOTE = `Also add an [AI_NAME] line naming which AI assistant you are (e.g. ChatGPT, Gemini, Claude, Grok) — just the name, one line. If you genuinely don't know, write "Unknown".`;
+
 // Only added to a prompt when a selected unit actually carries a folded-in footnote — most
 // units don't, and repeating this instruction on every batch regardless would be exactly the
 // prompt-bloat this app already avoids for Book Profile terms and Decision Memory.
@@ -1291,7 +1300,7 @@ function renderPromptParafrasa(sel){
   const body = sel.map(u => `[UNIT: ${u.id}]\n${u.source}`).join('\n\n');
   return `YOU ARE: ${srcLang} language editor performing PARAPHRASE-ONLY work on a manuscript. Do not translate to another language. Do not change the author's position, meaning, or tone. Only rephrase, staying in ${srcLang}.
 ${footnoteNoteFor(sel)}${bookProfileBlockFor()}${memoryBlockFor(sel.map(u => u.source).join('\n'))}
-For EACH unit below, return a ${srcLang} paraphrase and a short note flagging anything ambiguous, uncertain, or needing human attention (leave NOTES empty if there is nothing to flag). ${CLARIFY_FORMAT_NOTE} ${CONFIDENCE_GRADE_NOTE}
+For EACH unit below, return a ${srcLang} paraphrase and a short note flagging anything ambiguous, uncertain, or needing human attention (leave NOTES empty if there is nothing to flag). ${CLARIFY_FORMAT_NOTE} ${CONFIDENCE_GRADE_NOTE} ${AI_SOURCE_NOTE}
 
 UNITS:
 ${body}
@@ -1301,6 +1310,8 @@ Return EXACTLY this format, once per unit, in the same order, using the same [UN
 [PARAPHRASE]
 ...
 [CONFIDENCE]
+...
+[AI_NAME]
 ...
 [NOTES]
 ...
@@ -1321,7 +1332,7 @@ WRITE LIKE ${/^[aeiou]/i.test(lang) ? 'AN' : 'A'} ${lang.toUpperCase()} NOVELIST
 - If the source's sentence structure would produce several consecutive ${lang} sentences starting with the same subject pronoun (e.g. "I... I... I..."), vary the sentence openings the way a ${lang} novelist would, without changing who is doing what.
 - A local dialect, register, or texture in the source (e.g. a distinctive regional accent, a class of speech, a turn of phrase specific to one place) usually has no exact ${lang} equivalent — don't flatten it into a plain explanatory phrase. Translate the literal meaning as best you can, then use NOTES to flag that a texture was lost, so the editor can decide whether it needs a Decision Memory ruling for consistency across the book.
 ${footnoteNoteFor(sel)}${bookProfileBlockFor()}${memoryBlockFor(sel.map(u => u.source + '\n' + u.parafrasa.text).join('\n'))}
-For EACH unit below, return a translation into ${lang} and a short note flagging anything ambiguous, uncertain, a lost cultural texture, or needing human attention (leave NOTES empty if there is nothing to flag). ${CLARIFY_FORMAT_NOTE} ${CONFIDENCE_GRADE_NOTE}
+For EACH unit below, return a translation into ${lang} and a short note flagging anything ambiguous, uncertain, a lost cultural texture, or needing human attention (leave NOTES empty if there is nothing to flag). ${CLARIFY_FORMAT_NOTE} ${CONFIDENCE_GRADE_NOTE} ${AI_SOURCE_NOTE}
 
 UNITS:
 ${body}
@@ -1331,6 +1342,8 @@ Return EXACTLY this format, once per unit, in the same order, using the same [UN
 [TRANSLATION]
 ...
 [CONFIDENCE]
+...
+[AI_NAME]
 ...
 [NOTES]
 ...
@@ -1344,7 +1357,7 @@ function renderPromptBackTranslation(sel){
 
 Do NOT improve, polish, reinterpret, or correct anything. Do NOT try to make it read naturally. Literalness matters more than elegance here. This is a mirror used to detect meaning drift against the original text, not a new translation.
 ${footnoteNoteFor(sel, u => u.translation.text)}
-For EACH unit below, return the literal back-translation and a short note only if something is structurally impossible to render literally (leave NOTES empty otherwise). ${CLARIFY_FORMAT_NOTE} ${CONFIDENCE_GRADE_NOTE}
+For EACH unit below, return the literal back-translation and a short note only if something is structurally impossible to render literally (leave NOTES empty otherwise). ${CLARIFY_FORMAT_NOTE} ${CONFIDENCE_GRADE_NOTE} ${AI_SOURCE_NOTE}
 
 UNITS:
 ${body}
@@ -1354,6 +1367,8 @@ Return EXACTLY this format, once per unit, in the same order, using the same [UN
 [BACK_TRANSLATION]
 ...
 [CONFIDENCE]
+...
+[AI_NAME]
 ...
 [NOTES]
 ...
@@ -2026,6 +2041,7 @@ $('processBtn').onclick = () => {
   if(!Object.keys(chunks).length){ $('parseError').textContent = 'No [UNIT: id] markers found. Make sure the chatbot kept the requested format.'; return; }
   const fieldLabel = { parafrasa: 'PARAPHRASE', translation: 'TRANSLATION', backtranslation: 'BACK_TRANSLATION' }[mode];
   const targetField = PHASES[mode].field;
+  const aiSourceOverrideValue = $('aiSourceOverride').value;
 
   // A chatbot can cut out mid-reply and still return something that parses — the first unit, or a
   // bare "[UNIT: U0001]" with no body. Silently accepting that leaves the rest of the batch blank
@@ -2052,7 +2068,10 @@ $('processBtn').onclick = () => {
     const { notes, clarifications } = parseClarifications(extractLabeled(chunk, 'NOTES'));
     const gradeRaw = extractLabeled(chunk, 'CONFIDENCE').trim().toUpperCase().charAt(0);
     const grade = ['A', 'B', 'C'].includes(gradeRaw) ? gradeRaw : null;
-    u[targetField] = { text, notes, clarifications, grade, status: 'pending' };
+    // The editor's own dropdown always wins over whatever the chatbot self-reports — they know
+    // for certain which one they pasted from, the model is only guessing at its own identity.
+    const aiSource = aiSourceOverrideValue || extractLabeled(chunk, 'AI_NAME').trim() || null;
+    u[targetField] = { text, notes, clarifications, grade, aiSource, status: 'pending' };
     if(!firstAppliedId) firstAppliedId = id;
     applied++;
   });

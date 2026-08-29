@@ -218,6 +218,16 @@
           <details class="sidebar-section step-section batch-step" id="stepC">
             <summary><span class="chevron" aria-hidden="true">▸</span><h2>Step C · Paste the reply</h2><p id="stepCSummary" class="hint-small step-summary-line"></p></summary>
             <p class="hint-small">Status goes Sent → Awaiting review → Approved as you copy, then paste, then approve. If a copy failed or was never actually sent, a "Clear sent status" option appears above (next to the unit list) once anything is marked Sent. Use it to unstick that unit and pick it again.</p>
+            <label class="hint-small ai-source-label">Which chatbot is this from?
+              <select id="aiSourceOverride">
+                <option value="">Auto-detect from reply</option>
+                <option value="ChatGPT">ChatGPT</option>
+                <option value="Gemini">Gemini</option>
+                <option value="Claude">Claude</option>
+                <option value="Grok">Grok</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
             <textarea id="pasteIn" class="paste-in" placeholder="Paste the chatbot's full reply here…"></textarea>
             <p id="pasteInStatus" class="hint-small paste-status"></p>
             <button class="primary-button" id="processBtn">Process &amp; Save →</button>

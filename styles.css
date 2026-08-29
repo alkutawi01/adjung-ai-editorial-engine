@@ -332,6 +332,9 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .required-mark{font:600 9px var(--font-mono);color:var(--error);text-transform:uppercase;letter-spacing:.04em}
 .optional-tag{font:600 9px var(--font-mono);color:var(--muted);text-transform:none;letter-spacing:.02em;font-style:italic}
 .restore-paste-box{margin-top:8px;padding:10px;border-radius:var(--r-md);background:var(--paper);border:1px solid var(--line)}
+.ai-source-label{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ai-source-label select{padding:5px 8px;border:1px solid var(--line-strong);border-radius:var(--r-sm);font:12px var(--font-sans);background:#fff}
+.ai-source-tag{display:inline-block;padding:2px 8px;border-radius:var(--r-full);background:var(--paper);border:1px solid var(--line-strong);color:var(--muted);font:600 9px var(--font-mono);text-transform:uppercase;letter-spacing:.03em}
 
 .bp-fields{display:flex;flex-direction:column;gap:10px}
 .bp-field{border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 11px;background:var(--paper);transition:box-shadow var(--dur-fast) var(--ease)}
