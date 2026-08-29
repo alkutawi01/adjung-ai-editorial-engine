@@ -16,7 +16,7 @@ async function copyWithFeedback(textareaEl, btnEl){
   if(!ok){
     try{ ok = document.execCommand('copy'); }catch(e){ ok = false; }
   }
-  btnEl.textContent = ok ? '✓ Copied!' : '⚠ Copy failed. Text selected, use Ctrl+C';
+  btnEl.textContent = ok ? '✓ Copied!' : 'Copy failed. Text selected, use Ctrl+C';
   btnEl.classList.toggle('copied', ok);
   setTimeout(() => { btnEl.textContent = original; btnEl.classList.remove('copied'); }, 2000);
 }
@@ -830,7 +830,7 @@ function renderPhaseNav(){
   // be a lie the moment an earlier stage invalidates this one, so stale takes priority over it.
   const badge = (el, name, approved, pending, staleCount) => {
     const locked = phaseLocked(name);
-    $(el).textContent = locked ? '🔒 Locked' : staleCount ? `${staleCount} stale, rerun` : pending ? `${pending} to review` : approved ? `${approved} done` : '';
+    $(el).textContent = locked ? 'Locked' : staleCount ? `${staleCount} stale, rerun` : pending ? `${pending} to review` : approved ? `${approved} done` : '';
     $(el).className = 'phase-badge' + (locked ? ' locked' : staleCount ? ' stale' : pending ? ' pending' : approved ? ' done' : '');
   };
   $('badgeScan').textContent = doc?.bookProfile?.status === 'approved' ? 'done' : doc?.bookProfile?.status === 'pending' ? 'to review' : '';
@@ -1014,7 +1014,7 @@ function renderFinalChecklist(u){
   const shown = checklistShownIds.has(u.id);
   const checklist = u.finalChecklist || {};
   const doneCount = FINAL_CHECKLIST_ITEMS.filter(i => checklist[i.key]).length;
-  const toggle = `<button class="text-button" data-togglechecklist="${escapeHtml(u.id)}">${shown ? '✕ Hide checklist' : `☑ Pre-FINAL checklist (${doneCount}/${FINAL_CHECKLIST_ITEMS.length})`}</button>`;
+  const toggle = `<button class="text-button" data-togglechecklist="${escapeHtml(u.id)}">${shown ? 'Hide checklist' : `Pre-FINAL checklist (${doneCount}/${FINAL_CHECKLIST_ITEMS.length})`}</button>`;
   if(!shown) return toggle;
   const items = FINAL_CHECKLIST_ITEMS.map(i => `<label class="checklist-item"><input type="checkbox" data-checklistitem="${escapeHtml(u.id)}|${i.key}" ${checklist[i.key] ? 'checked' : ''}> ${escapeHtml(i.label)}</label>`).join('');
   return `${toggle}<div class="final-checklist">${items}</div>`;
@@ -1114,7 +1114,7 @@ function finalFieldBlock(u, fieldKey){
       <div class="unit-actions"><button class="text-button" data-cancelfinaledit="1">Cancel</button><button class="approve-button" data-savefinaledit="${escapeHtml(u.id)}|${fieldKey}">✓ Save</button></div>`;
   }
   return `<div class="final-field-wrap">${fieldBlock(meta.label, text, meta.cls, meta.kind)}<button class="text-button edit-button final-edit-btn" data-editfinal="${escapeHtml(u.id)}|${fieldKey}">✎ Edit</button></div>
-    ${u[fieldKey].aiSource ? `<span class="ai-source-tag" title="Which chatbot produced this ${meta.label.toLowerCase()}">🤖 ${escapeHtml(u[fieldKey].aiSource)}</span>` : ''}
+    ${u[fieldKey].aiSource ? `<span class="ai-source-tag" title="Which chatbot produced this ${meta.label.toLowerCase()}">${escapeHtml(u[fieldKey].aiSource)}</span>` : ''}
     ${renderClarifications(u.id, fieldKey, u[fieldKey].clarifications)}`;
 }
 
@@ -1152,11 +1152,11 @@ function renderUnitList(){
         ${finalFieldBlock(u, 'parafrasa')}
         ${finalFieldBlock(u, 'translation')}
         ${isStale
-          ? `<p class="stale-banner">⚠ Back Translation is stale. It no longer matches the current Translation. <button class="text-button" data-gotobt="${escapeHtml(u.id)}">Go rerun it →</button></p>`
+          ? `<p class="stale-banner">Back Translation is stale. It no longer matches the current Translation. <button class="text-button" data-gotobt="${escapeHtml(u.id)}">Go rerun it →</button></p>`
           : `${finalFieldBlock(u, 'backTranslation')}
-             <button class="text-button" data-togglediff="${escapeHtml(u.id)}">${showingDiff ? '✕ Hide differences' : '🔍 Show differences (Original ↔ Back Translation)'}</button>
+             <button class="text-button" data-togglediff="${escapeHtml(u.id)}">${showingDiff ? 'Hide differences' : 'Show differences (Original ↔ Back Translation)'}</button>
              ${diffBlock}
-             ${computeFinalWarnings(u).length ? `<div class="final-warning-banner">${computeFinalWarnings(u).map(w => `<p>⚠ ${escapeHtml(w)}</p>`).join('')}</div>` : ''}
+             ${computeFinalWarnings(u).length ? `<div class="final-warning-banner">${computeFinalWarnings(u).map(w => `<p>${escapeHtml(w)}</p>`).join('')}</div>` : ''}
              ${renderFinalChecklist(u)}`}
         <div class="unit-actions final-actions-sticky">${isStale
           ? `<span class="hint-small">Rerun Back Translation before this unit can be marked FINAL again.</span>`
@@ -1182,13 +1182,13 @@ function renderUnitList(){
         <b>${escapeHtml(u.id)}</b>
         <span class="unit-status ${w.status}">${statusLabel(w.status)}</span>
         ${w.grade ? `<span class="grade-badge grade-${w.grade}" title="Chatbot's self-reported confidence in this ${label.toLowerCase()}">${w.grade}</span>` : ''}
-        ${w.aiSource ? `<span class="ai-source-tag" title="Which chatbot produced this ${label.toLowerCase()}">🤖 ${escapeHtml(w.aiSource)}</span>` : ''}
+        ${w.aiSource ? `<span class="ai-source-tag" title="Which chatbot produced this ${label.toLowerCase()}">${escapeHtml(w.aiSource)}</span>` : ''}
         ${u.final ? '<span class="unit-status approved">FINAL</span>' : ''}
       </div>
       ${fieldBlock('ORIGINAL TEXT', u.source, '', 'original')}
       ${refLabel ? fieldBlock(refLabel, refText, 'reference', mode === 'translation' ? 'parafrasa' : 'translation') : ''}
-      ${w.status === 'stale' ? `<p class="stale-banner">⚠ ${statusLabel('stale')}. The text below is outdated. Pick this unit above to send it again.</p>` : ''}
-      ${w.grade === 'C' ? `<p class="grade-c-banner">⚠ Chatbot flagged low confidence on this ${label.toLowerCase()}, worth a closer read.</p>` : ''}
+      ${w.status === 'stale' ? `<p class="stale-banner">${statusLabel('stale')}. The text below is outdated. Pick this unit above to send it again.</p>` : ''}
+      ${w.grade === 'C' ? `<p class="grade-c-banner">Chatbot flagged low confidence on this ${label.toLowerCase()}, worth a closer read.</p>` : ''}
       ${editingUnitId === u.id
         ? `<div class="unit-field kind-${mode}"><small>${label} (editing)</small><textarea class="edit-textarea" id="editTextarea" dir="auto">${escapeHtml(w.text)}</textarea></div>
            <div class="unit-actions"><button class="text-button" data-canceledit="${escapeHtml(u.id)}">Cancel</button><button class="approve-button" data-saveedit="${escapeHtml(u.id)}">✓ Save</button></div>`
@@ -1229,7 +1229,7 @@ function renderSentBanner(){
   if(!sentUnits.length){ $('sentBannerSection').hidden = true; return; }
   $('sentBannerSection').hidden = false;
   const oldest = sentUnits.reduce((a, b) => new Date(workField(a).sentAt) < new Date(workField(b).sentAt) ? a : b);
-  $('sentBanner').textContent = `⏳ ${sentUnits.length} unit(s) sent (${sentUnits.map(u => u.id).join(', ')}), oldest ${minutesAgo(workField(oldest).sentAt)}, no reply processed yet. Don't resend unless the send genuinely failed.`;
+  $('sentBanner').textContent = `${sentUnits.length} unit(s) sent (${sentUnits.map(u => u.id).join(', ')}), oldest ${minutesAgo(workField(oldest).sentAt)}, no reply processed yet. Don't resend unless the send genuinely failed.`;
 }
 $('clearSentBtn').onclick = () => {
   (doc?.units || []).forEach(u => { if(workField(u).status === 'sent'){ workField(u).status = 'none'; workField(u).sentAt = null; } });
@@ -1663,7 +1663,7 @@ function renderPilotBanner(){
   const show = !doc.pilotConfirmed && !pilotBannerDismissed && approvedCount >= 1 && approvedCount <= PILOT_BATCH_UNITS + 1 && doc.units.length > PILOT_BATCH_UNITS;
   section.hidden = !show;
   if(!show) return;
-  $('pilotBannerText').textContent = `🧪 ${approvedCount} unit(s) have gone all the way through Paraphrase → Translation → Back Translation. Read them over: is the voice, terminology and register right? Confirm before picking more units for the rest of the book.`;
+  $('pilotBannerText').textContent = `${approvedCount} unit(s) have gone all the way through Paraphrase → Translation → Back Translation. Read them over: is the voice, terminology and register right? Confirm before picking more units for the rest of the book.`;
 }
 $('pilotConfirmBtn').onclick = () => { doc.pilotConfirmed = true; save(); renderPilotBanner(); };
 $('pilotRefineBtn').onclick = () => { pilotBannerDismissed = true; renderPilotBanner(); };
@@ -1959,7 +1959,7 @@ $('gdocBackupBtn').onclick = async () => {
   window.open('https://docs.google.com/document/create', '_blank');
   $('backupMsg').textContent = copied
     ? '✓ Backup copied. A new Google Doc just opened, press Ctrl+V (Cmd+V on Mac) to paste it in.'
-    : '⚠ Could not copy automatically. A new Google Doc opened; copy the backup from "Download full backup" and paste it in manually.';
+    : 'Could not copy automatically. A new Google Doc opened; copy the backup from "Download full backup" and paste it in manually.';
 };
 
 // ---- Copy & paste ------------------------------------------------------------
@@ -2022,10 +2022,10 @@ $('pasteIn').addEventListener('input', () => {
   const found = Object.keys(chunks).length;
   const targetField = PHASES[mode].field;
   const outstanding = doc.units.filter(u => u[targetField].status === 'sent').length;
-  if(!found){ el.textContent = '⚠ No [UNIT: id] markers detected yet. Check the reply kept the requested format.'; el.className = 'hint-small paste-status warn'; return; }
+  if(!found){ el.textContent = 'No [UNIT: id] markers detected yet. Check the reply kept the requested format.'; el.className = 'hint-small paste-status warn'; return; }
   if(outstanding && found < outstanding){
     const missingIds = doc.units.filter(u => u[targetField].status === 'sent' && !chunks[u.id]).map(u => u.id);
-    el.textContent = `⚠ ${found} of ${outstanding} sent unit(s) detected, missing ${missingIds.join(', ') || 'some units'}. Looks incomplete.`;
+    el.textContent = `${found} of ${outstanding} sent unit(s) detected, missing ${missingIds.join(', ') || 'some units'}. Looks incomplete.`;
     el.className = 'hint-small paste-status warn';
     return;
   }
