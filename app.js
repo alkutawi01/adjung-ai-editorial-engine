@@ -1,10 +1,32 @@
 const $ = id => document.getElementById(id);
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 
+// A small line-icon set, thin single-weight strokes, stroke="currentColor" so every icon
+// automatically inherits whatever color its surrounding text already has (maroon, warn, error,
+// muted) instead of carrying its own fixed palette the way an emoji does. Same restrained,
+// editorial register as the ▸ chevron and ✓/⬇/▣ marks already used throughout — replaces the
+// colorful pictograph emoji this app briefly had, without going back to no icon at all.
+const ICON_PATHS = {
+  ai: '<rect x="4" y="4" width="8" height="8" rx="1.5"/><path d="M6.5 1.5v2.5M9.5 1.5v2.5M6.5 12v2.5M9.5 12v2.5M1.5 6.5h2.5M1.5 9.5h2.5M12 6.5h2.5M12 9.5h2.5"/><circle cx="6.6" cy="7.8" r=".5" fill="currentColor" stroke="none"/><circle cx="9.4" cy="7.8" r=".5" fill="currentColor" stroke="none"/>',
+  pilot: '<path d="M6.3 1.5h3.4"/><path d="M7 1.5v4.2L3.7 12a1.1 1.1 0 0 0 1 1.6h6.6a1.1 1.1 0 0 0 1-1.6L9 5.7V1.5"/><path d="M5.2 9.5h5.6"/>',
+  start: '<path d="M2.5 8h10M8.5 3.5 13 8l-4.5 4.5"/>',
+  locked: '<rect x="3.25" y="7" width="9.5" height="6.25" rx="1.25"/><path d="M5.25 7V5a2.75 2.75 0 0 1 5.5 0v2"/>',
+  compare: '<path d="M8 1.5v13"/><path d="M2 5h2.3M2 8h2.3M2 11h2.3M14 5h-2.3M14 8h-2.3M14 11h-2.3"/>',
+  warn: '<path d="M8 1.8 1.3 13.5h13.4L8 1.8z"/><path d="M8 6.2v3.3M8 11.6h.01"/>',
+  doc: '<path d="M4 1.5h5.2L12 4.3v10.2H4z"/><path d="M9.2 1.5v2.8H12"/>',
+  checklist: '<rect x="2" y="2" width="12" height="12" rx="1.75"/><path d="M4.7 8.1 6.6 10l4-4.6"/>',
+  clock: '<circle cx="8" cy="8" r="6.2"/><path d="M8 4.8V8l2.3 1.6"/>'
+};
+function icon(name, extraClass){
+  const path = ICON_PATHS[name];
+  if(!path) return '';
+  return `<svg class="icon${extraClass ? ' ' + extraClass : ''}" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
+}
+
 // Copies a textarea and confirms visibly either way. A silent clipboard failure used to leave
 // the editor unsure whether anything was actually copied.
 async function copyWithFeedback(textareaEl, btnEl){
-  const original = btnEl.textContent;
+  const original = btnEl.innerHTML;
   let ok = false;
   try{ await navigator.clipboard.writeText(textareaEl.value); ok = true; }catch(e){ ok = false; }
   // The modern Clipboard API silently throws in a handful of real situations that have nothing
@@ -16,9 +38,9 @@ async function copyWithFeedback(textareaEl, btnEl){
   if(!ok){
     try{ ok = document.execCommand('copy'); }catch(e){ ok = false; }
   }
-  btnEl.textContent = ok ? '✓ Copied!' : 'Copy failed. Text selected, use Ctrl+C';
+  btnEl.innerHTML = ok ? '✓ Copied!' : `${icon('warn')}Copy failed. Text selected, use Ctrl+C`;
   btnEl.classList.toggle('copied', ok);
-  setTimeout(() => { btnEl.textContent = original; btnEl.classList.remove('copied'); }, 2000);
+  setTimeout(() => { btnEl.innerHTML = original; btnEl.classList.remove('copied'); }, 2000);
 }
 
 // ---- Storage -----------------------------------------------------------------
@@ -830,7 +852,7 @@ function renderPhaseNav(){
   // be a lie the moment an earlier stage invalidates this one, so stale takes priority over it.
   const badge = (el, name, approved, pending, staleCount) => {
     const locked = phaseLocked(name);
-    $(el).textContent = locked ? 'Locked' : staleCount ? `${staleCount} stale, rerun` : pending ? `${pending} to review` : approved ? `${approved} done` : '';
+    $(el).innerHTML = locked ? `${icon('locked')}Locked` : staleCount ? `${staleCount} stale, rerun` : pending ? `${pending} to review` : approved ? `${approved} done` : '';
     $(el).className = 'phase-badge' + (locked ? ' locked' : staleCount ? ' stale' : pending ? ' pending' : approved ? ' done' : '');
   };
   $('badgeScan').textContent = doc?.bookProfile?.status === 'approved' ? 'done' : doc?.bookProfile?.status === 'pending' ? 'to review' : '';
@@ -1014,7 +1036,7 @@ function renderFinalChecklist(u){
   const shown = checklistShownIds.has(u.id);
   const checklist = u.finalChecklist || {};
   const doneCount = FINAL_CHECKLIST_ITEMS.filter(i => checklist[i.key]).length;
-  const toggle = `<button class="text-button" data-togglechecklist="${escapeHtml(u.id)}">${shown ? 'Hide checklist' : `Pre-FINAL checklist (${doneCount}/${FINAL_CHECKLIST_ITEMS.length})`}</button>`;
+  const toggle = `<button class="text-button" data-togglechecklist="${escapeHtml(u.id)}">${icon('checklist')}${shown ? 'Hide checklist' : `Pre-FINAL checklist (${doneCount}/${FINAL_CHECKLIST_ITEMS.length})`}</button>`;
   if(!shown) return toggle;
   const items = FINAL_CHECKLIST_ITEMS.map(i => `<label class="checklist-item"><input type="checkbox" data-checklistitem="${escapeHtml(u.id)}|${i.key}" ${checklist[i.key] ? 'checked' : ''}> ${escapeHtml(i.label)}</label>`).join('');
   return `${toggle}<div class="final-checklist">${items}</div>`;
@@ -1114,7 +1136,7 @@ function finalFieldBlock(u, fieldKey){
       <div class="unit-actions"><button class="text-button" data-cancelfinaledit="1">Cancel</button><button class="approve-button" data-savefinaledit="${escapeHtml(u.id)}|${fieldKey}">✓ Save</button></div>`;
   }
   return `<div class="final-field-wrap">${fieldBlock(meta.label, text, meta.cls, meta.kind)}<button class="text-button edit-button final-edit-btn" data-editfinal="${escapeHtml(u.id)}|${fieldKey}">✎ Edit</button></div>
-    ${u[fieldKey].aiSource ? `<span class="ai-source-tag" title="Which chatbot produced this ${meta.label.toLowerCase()}">${escapeHtml(u[fieldKey].aiSource)}</span>` : ''}
+    ${u[fieldKey].aiSource ? `<span class="ai-source-tag" title="Which chatbot produced this ${meta.label.toLowerCase()}">${icon('ai')}${escapeHtml(u[fieldKey].aiSource)}</span>` : ''}
     ${renderClarifications(u.id, fieldKey, u[fieldKey].clarifications)}`;
 }
 
@@ -1152,11 +1174,11 @@ function renderUnitList(){
         ${finalFieldBlock(u, 'parafrasa')}
         ${finalFieldBlock(u, 'translation')}
         ${isStale
-          ? `<p class="stale-banner">Back Translation is stale. It no longer matches the current Translation. <button class="text-button" data-gotobt="${escapeHtml(u.id)}">Go rerun it →</button></p>`
+          ? `<p class="stale-banner">${icon('warn')}Back Translation is stale. It no longer matches the current Translation. <button class="text-button" data-gotobt="${escapeHtml(u.id)}">Go rerun it →</button></p>`
           : `${finalFieldBlock(u, 'backTranslation')}
-             <button class="text-button" data-togglediff="${escapeHtml(u.id)}">${showingDiff ? 'Hide differences' : 'Show differences (Original ↔ Back Translation)'}</button>
+             <button class="text-button" data-togglediff="${escapeHtml(u.id)}">${icon('compare')}${showingDiff ? 'Hide differences' : 'Show differences (Original ↔ Back Translation)'}</button>
              ${diffBlock}
-             ${computeFinalWarnings(u).length ? `<div class="final-warning-banner">${computeFinalWarnings(u).map(w => `<p>${escapeHtml(w)}</p>`).join('')}</div>` : ''}
+             ${computeFinalWarnings(u).length ? `<div class="final-warning-banner">${computeFinalWarnings(u).map(w => `<p>${icon('warn')}${escapeHtml(w)}</p>`).join('')}</div>` : ''}
              ${renderFinalChecklist(u)}`}
         <div class="unit-actions final-actions-sticky">${isStale
           ? `<span class="hint-small">Rerun Back Translation before this unit can be marked FINAL again.</span>`
@@ -1182,13 +1204,13 @@ function renderUnitList(){
         <b>${escapeHtml(u.id)}</b>
         <span class="unit-status ${w.status}">${statusLabel(w.status)}</span>
         ${w.grade ? `<span class="grade-badge grade-${w.grade}" title="Chatbot's self-reported confidence in this ${label.toLowerCase()}">${w.grade}</span>` : ''}
-        ${w.aiSource ? `<span class="ai-source-tag" title="Which chatbot produced this ${label.toLowerCase()}">${escapeHtml(w.aiSource)}</span>` : ''}
+        ${w.aiSource ? `<span class="ai-source-tag" title="Which chatbot produced this ${label.toLowerCase()}">${icon('ai')}${escapeHtml(w.aiSource)}</span>` : ''}
         ${u.final ? '<span class="unit-status approved">FINAL</span>' : ''}
       </div>
       ${fieldBlock('ORIGINAL TEXT', u.source, '', 'original')}
       ${refLabel ? fieldBlock(refLabel, refText, 'reference', mode === 'translation' ? 'parafrasa' : 'translation') : ''}
-      ${w.status === 'stale' ? `<p class="stale-banner">${statusLabel('stale')}. The text below is outdated. Pick this unit above to send it again.</p>` : ''}
-      ${w.grade === 'C' ? `<p class="grade-c-banner">Chatbot flagged low confidence on this ${label.toLowerCase()}, worth a closer read.</p>` : ''}
+      ${w.status === 'stale' ? `<p class="stale-banner">${icon('warn')}${statusLabel('stale')}. The text below is outdated. Pick this unit above to send it again.</p>` : ''}
+      ${w.grade === 'C' ? `<p class="grade-c-banner">${icon('warn')}Chatbot flagged low confidence on this ${label.toLowerCase()}, worth a closer read.</p>` : ''}
       ${editingUnitId === u.id
         ? `<div class="unit-field kind-${mode}"><small>${label} (editing)</small><textarea class="edit-textarea" id="editTextarea" dir="auto">${escapeHtml(w.text)}</textarea></div>
            <div class="unit-actions"><button class="text-button" data-canceledit="${escapeHtml(u.id)}">Cancel</button><button class="approve-button" data-saveedit="${escapeHtml(u.id)}">✓ Save</button></div>`
@@ -1229,7 +1251,7 @@ function renderSentBanner(){
   if(!sentUnits.length){ $('sentBannerSection').hidden = true; return; }
   $('sentBannerSection').hidden = false;
   const oldest = sentUnits.reduce((a, b) => new Date(workField(a).sentAt) < new Date(workField(b).sentAt) ? a : b);
-  $('sentBanner').textContent = `${sentUnits.length} unit(s) sent (${sentUnits.map(u => u.id).join(', ')}), oldest ${minutesAgo(workField(oldest).sentAt)}, no reply processed yet. Don't resend unless the send genuinely failed.`;
+  $('sentBanner').innerHTML = `${icon('clock')}${sentUnits.length} unit(s) sent (${sentUnits.map(u => u.id).join(', ')}), oldest ${minutesAgo(workField(oldest).sentAt)}, no reply processed yet. Don't resend unless the send genuinely failed.`;
 }
 $('clearSentBtn').onclick = () => {
   (doc?.units || []).forEach(u => { if(workField(u).status === 'sent'){ workField(u).status = 'none'; workField(u).sentAt = null; } });
@@ -1663,7 +1685,7 @@ function renderPilotBanner(){
   const show = !doc.pilotConfirmed && !pilotBannerDismissed && approvedCount >= 1 && approvedCount <= PILOT_BATCH_UNITS + 1 && doc.units.length > PILOT_BATCH_UNITS;
   section.hidden = !show;
   if(!show) return;
-  $('pilotBannerText').textContent = `${approvedCount} unit(s) have gone all the way through Paraphrase → Translation → Back Translation. Read them over: is the voice, terminology and register right? Confirm before picking more units for the rest of the book.`;
+  $('pilotBannerText').innerHTML = `${icon('pilot')}${approvedCount} unit(s) have gone all the way through Paraphrase → Translation → Back Translation. Read them over: is the voice, terminology and register right? Confirm before picking more units for the rest of the book.`;
 }
 $('pilotConfirmBtn').onclick = () => { doc.pilotConfirmed = true; save(); renderPilotBanner(); };
 $('pilotRefineBtn').onclick = () => { pilotBannerDismissed = true; renderPilotBanner(); };
@@ -1957,9 +1979,9 @@ $('gdocBackupBtn').onclick = async () => {
   localStorage.setItem(LIB_KEY, JSON.stringify(library));
   renderBackupStatus();
   window.open('https://docs.google.com/document/create', '_blank');
-  $('backupMsg').textContent = copied
+  $('backupMsg').innerHTML = copied
     ? '✓ Backup copied. A new Google Doc just opened, press Ctrl+V (Cmd+V on Mac) to paste it in.'
-    : 'Could not copy automatically. A new Google Doc opened; copy the backup from "Download full backup" and paste it in manually.';
+    : `${icon('warn')}Could not copy automatically. A new Google Doc opened; copy the backup from "Download full backup" and paste it in manually.`;
 };
 
 // ---- Copy & paste ------------------------------------------------------------
@@ -2017,19 +2039,19 @@ function parseBatchResponse(raw){
 $('pasteIn').addEventListener('input', () => {
   const el = $('pasteInStatus');
   const raw = $('pasteIn').value.trim();
-  if(!raw){ el.textContent = ''; el.className = 'hint-small paste-status'; return; }
+  if(!raw){ el.innerHTML = ''; el.className = 'hint-small paste-status'; return; }
   const chunks = parseBatchResponse(raw);
   const found = Object.keys(chunks).length;
   const targetField = PHASES[mode].field;
   const outstanding = doc.units.filter(u => u[targetField].status === 'sent').length;
-  if(!found){ el.textContent = 'No [UNIT: id] markers detected yet. Check the reply kept the requested format.'; el.className = 'hint-small paste-status warn'; return; }
+  if(!found){ el.innerHTML = `${icon('warn')}No [UNIT: id] markers detected yet. Check the reply kept the requested format.`; el.className = 'hint-small paste-status warn'; return; }
   if(outstanding && found < outstanding){
     const missingIds = doc.units.filter(u => u[targetField].status === 'sent' && !chunks[u.id]).map(u => u.id);
-    el.textContent = `${found} of ${outstanding} sent unit(s) detected, missing ${missingIds.join(', ') || 'some units'}. Looks incomplete.`;
+    el.innerHTML = `${icon('warn')}${found} of ${outstanding} sent unit(s) detected, missing ${missingIds.join(', ') || 'some units'}. Looks incomplete.`;
     el.className = 'hint-small paste-status warn';
     return;
   }
-  el.textContent = found === 1 ? '✓ 1 unit detected. Structure is valid, review the content before saving.' : `✓ ${found} units detected. Structure is valid, review the content before saving.`;
+  el.innerHTML = found === 1 ? '✓ 1 unit detected. Structure is valid, review the content before saving.' : `✓ ${found} units detected. Structure is valid, review the content before saving.`;
   el.className = 'hint-small paste-status ok';
 });
 

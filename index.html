@@ -68,7 +68,7 @@
           <h2>Backup <span class="optional-tag">optional, anytime</span></h2>
           <p class="hint-small">Not a required step. Saves every book and all in-progress work, whenever you click it, not just after Final Review. Local storage can be lost if the browser is cleared or the device fails, so keep a copy outside the browser every so often.</p>
           <button class="copy-button" id="backupBtn">⬇ Download full backup</button>
-          <button class="text-button" id="gdocBackupBtn">Backup via Google Doc…</button>
+          <button class="text-button" id="gdocBackupBtn"><svg class="icon" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 1.5h5.2L12 4.3v10.2H4z"/><path d="M9.2 1.5v2.8H12"/></svg>Backup via Google Doc…</button>
           <input type="file" id="restoreInput" accept=".json" hidden>
           <button class="text-button" id="restoreBtn">Restore from backup file…</button>
           <button class="text-button" id="restorePasteToggleBtn">Restore from pasted text…</button>
@@ -106,7 +106,7 @@
               <button class="copy-button" id="copyBookScanBtn">▣ Copy prompt</button>
               <div id="scanCoachTip" class="coach-tip" hidden>
                 <span class="coach-tip-arrow"></span>
-                <p>Start here: copy this, then send it to your chatbot together with the .docx file you just uploaded.</p>
+                <p><svg class="icon" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 8h10M8.5 3.5 13 8l-4.5 4.5"/></svg>Start here: copy this, then send it to your chatbot together with the .docx file you just uploaded.</p>
                 <button class="text-button" id="scanCoachTipDismiss">Got it</button>
               </div>
             </div>
@@ -202,7 +202,7 @@
             <div class="select-row">
               <button class="text-button" id="selectAllBtn">Select all filtered</button>
               <button class="text-button" id="suggestBatchBtn">Suggested batch</button>
-              <button class="text-button" id="pilotBatchBtn">Pilot (2 units)</button>
+              <button class="text-button" id="pilotBatchBtn"><svg class="icon" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.3 1.5h3.4"/><path d="M7 1.5v4.2L3.7 12a1.1 1.1 0 0 0 1 1.6h6.6a1.1 1.1 0 0 0 1-1.6L9 5.7V1.5"/><path d="M5.2 9.5h5.6"/></svg>Pilot (2 units)</button>
               <button class="text-button" id="selectNoneBtn">Clear</button>
             </div>
             <p class="hint-small">Limits exist because a chatbot's reply can cut out mid-batch on very long prompts, and a smaller batch is easier to review carefully. "Suggested batch" adds up to 5 more not-yet-started units, good for one comfortable review pass; "Select all filtered" fills up to the hard limit below in one go. New book? Run "Pilot" through all three phases first, then confirm the Translation Guide fits before committing the rest of the book to it.</p>
