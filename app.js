@@ -15,7 +15,9 @@ const ICON_PATHS = {
   warn: '<path d="M8 1.8 1.3 13.5h13.4L8 1.8z"/><path d="M8 6.2v3.3M8 11.6h.01"/>',
   doc: '<path d="M4 1.5h5.2L12 4.3v10.2H4z"/><path d="M9.2 1.5v2.8H12"/>',
   checklist: '<rect x="2" y="2" width="12" height="12" rx="1.75"/><path d="M4.7 8.1 6.6 10l4-4.6"/>',
-  clock: '<circle cx="8" cy="8" r="6.2"/><path d="M8 4.8V8l2.3 1.6"/>'
+  clock: '<circle cx="8" cy="8" r="6.2"/><path d="M8 4.8V8l2.3 1.6"/>',
+  upload: '<path d="M8 10.5V2.5M8 2.5 5 5.3M8 2.5l3 2.8"/><path d="M2.5 11v1.5A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5V11"/>',
+  clipboard: '<rect x="4" y="3" width="8" height="11" rx="1.2"/><path d="M6.2 3v-.8A1.2 1.2 0 0 1 7.4 1h1.2a1.2 1.2 0 0 1 1.2 1.2V3"/><path d="M6.3 7.5h3.4M6.3 10h3.4"/>'
 };
 function icon(name, extraClass){
   const path = ICON_PATHS[name];
@@ -70,6 +72,16 @@ let editingUnitId = null;
 // this size natively, and a bigger batch means fewer copy/paste/wait cycles per phase.
 const BATCH_MAX_CHARS = 12000;
 const BATCH_MAX_SENTENCES = 100;
+// A Meaning Check reply runs well under half the length of a full paraphrase for the same source
+// text (verified live: ~5,900 vs ~13,850 chars on a 19-unit chapter) — the chatbot side of a v2
+// batch has that much headroom to spare. Doubled, not scaled further, per the conservative
+// "raise once, verify it's stable, only then reconsider" plan; only Fasa 1 gets the boost, since
+// that's the phase whose output actually shrank — Translation and Back Translation still work on
+// the old full text either way, so their per-unit prompt cost hasn't changed.
+function currentBatchLimits(){
+  const boosted = mode === 'parafrasa' && doc?.workflowVersion === 2;
+  return { chars: boosted ? BATCH_MAX_CHARS * 2 : BATCH_MAX_CHARS, sentences: boosted ? BATCH_MAX_SENTENCES * 2 : BATCH_MAX_SENTENCES };
+}
 function countSentences(text){ return Math.max(1, (text.match(/[.!?…]+(\s|$)/g) || []).length); }
 function batchStatsFor(units){
   return units.reduce((acc, u) => ({ chars: acc.chars + u.source.length, sentences: acc.sentences + countSentences(u.source) }), { chars: 0, sentences: 0 });
@@ -96,11 +108,17 @@ function normalizeDoc(d){
     d.bookProfile.fields = d.bookProfile.text ? parseBookProfileFields(d.bookProfile.text) : null;
     delete d.bookProfile.text;
   }
+  if(d.bookProfile.version === undefined) d.bookProfile.version = 1;
   if(!d.decisionMemory) d.decisionMemory = [];
   if(d.targetLang === undefined) d.targetLang = '';
   if(d.sourceLang === undefined) d.sourceLang = '';
   if(d.pilotConfirmed === undefined) d.pilotConfirmed = false;
   if(d.scanCoachDismissed === undefined) d.scanCoachDismissed = false;
+  // A book already in storage before Meaning Check existed must never be silently switched onto
+  // it — that would change its Fasa 1 output contract after the fact. Undefined here always means
+  // "predates this feature", so it resolves to the old (full-paraphrase) contract, version 1. Only
+  // a genuinely new upload (see handleUploadedFile) is stamped version 2 from the start.
+  if(d.workflowVersion === undefined) d.workflowVersion = 1;
   (d.units || []).forEach(u => {
     if(!u.parafrasa) u.parafrasa = blankWork();
     if(!u.translation) u.translation = blankWork();
@@ -113,7 +131,7 @@ Object.values(library.books).forEach(normalizeDoc);
 function save(){
   if(doc){ library.books[doc.fileName] = doc; library.activeFile = doc.fileName; }
   localStorage.setItem(LIB_KEY, JSON.stringify(library));
-  $('savedState').textContent = '● Saved locally';
+  $('savedState').textContent = 'Saved locally';
 }
 
 // ---- Unit splitting ---------------------------------------------------------
@@ -229,7 +247,12 @@ async function handleUploadedFile(file){
       fileName: file.name, units: freshUnits,
       bookProfile: existing?.bookProfile ?? { fields: null, status: 'none' },
       decisionMemory: existing?.decisionMemory ?? [],
-      targetLang: existing?.targetLang ?? '', sourceLang: existing?.sourceLang ?? ''
+      targetLang: existing?.targetLang ?? '', sourceLang: existing?.sourceLang ?? '',
+      // A genuinely new book (no prior entry under this filename) starts on the Meaning Check
+      // contract (v2) by default — no toggle, no per-book choice. Re-uploading a book that was
+      // already being worked on keeps whatever contract it already had, defaulting to the legacy
+      // v1 only if that prior entry itself predates this feature. See normalizeDoc for why.
+      workflowVersion: existing ? (existing.workflowVersion ?? 1) : 2
     };
     normalizeDoc(doc);
     save();
@@ -329,7 +352,21 @@ function renderBookProfilePanel(){
     ? `<button class="reject-button" id="bpReject">Reject and redo</button><button class="approve-button" id="bpApprove">✓ Approve Translation Guide &amp; Start Paraphrase</button>`
     : `<button class="reject-button" id="bpReopen">Reopen for review</button>`) + exportBtn;
   if($('bpApprove')) $('bpApprove').onclick = () => {
-    doc.bookProfile.status = 'approved'; save(); renderAll(); setPhase('parafrasa');
+    // Only a genuine re-approval (Reopen → edit → Approve again, with work already sitting on the
+    // old Guide) bumps the version and sweeps for stale units — the very first approval of a fresh
+    // book has nothing yet for a version bump to invalidate.
+    const isReapproval = doc.bookProfile.version > 1 || (doc?.units || []).some(u => u.parafrasa.status !== 'none' || u.translation.status !== 'none');
+    doc.bookProfile.status = 'approved';
+    let staleCount = 0;
+    if(isReapproval){
+      doc.bookProfile.version = (doc.bookProfile.version || 1) + 1;
+      staleCount = invalidateForProfileChange(doc.bookProfile.version);
+    }
+    save(); renderAll(); setPhase('parafrasa');
+    if(staleCount){
+      $('nextUnlockLine').hidden = false;
+      $('nextUnlockLine').textContent = `Translation Guide updated: ${staleCount} field(s) on units built under the old Guide are now marked stale and need rerunning.`;
+    }
   };
   if($('bpReject')) $('bpReject').onclick = () => {
     doc.bookProfile = { fields: null, status: 'none' }; save(); renderAll();
@@ -690,9 +727,16 @@ $('dmList').addEventListener('click', e => {
   if(saveBtn){
     const entry = doc.decisionMemory.find(x => x.id === saveBtn.dataset.dmsaveedit);
     const newDecision = $('dmEditDecision').value.trim();
+    const rulingChanged = entry && newDecision !== entry.decision;
     if(entry){ entry.decision = newDecision; entry.category = $('dmEditCategory').value; }
+    // Only the ruling text changing matters here — re-saving with the same text (e.g. just
+    // switching category) never touches what any unit was actually shown.
+    const staleCount = rulingChanged && entry.term ? invalidateForDecisionMemoryChange(entry.term) : 0;
     editingDmId = null;
-    save(); renderDecisionMemory(); renderPrompt();
+    save(); renderDecisionMemory(); renderPrompt(); renderAll();
+    if(staleCount){
+      $('dmIoMsg').textContent = `✓ Ruling updated: ${staleCount} field(s) on unit(s) that used the old ruling are now marked stale and need rerunning.`;
+    }
     return;
   }
 });
@@ -762,6 +806,43 @@ function invalidateDownstream(u, fromField){
   }
   if(u.final){ u.final = false; invalidated.push('FINAL'); }
   return invalidated;
+}
+
+// Book Profile and Translation guide the chatbot on EVERY Paraphrase/Translation unit (needsBookProfile
+// phases) — editing it after work already exists means some of that work was produced under
+// instructions that no longer hold. Re-approving after an edit has to say which units that
+// actually touches, not leave them silently marked "approved" against a Guide that moved on.
+function invalidateForProfileChange(newVersion){
+  let count = 0;
+  (doc?.units || []).forEach(u => {
+    ['parafrasa', 'translation'].forEach(f => {
+      const w = u[f];
+      if(['approved', 'pending', 'sent'].includes(w.status) && (w.bookProfileVersion ?? 1) < newVersion){
+        w.status = 'stale';
+        invalidateDownstream(u, f);
+        count++;
+      }
+    });
+  });
+  return count;
+}
+// A Decision Memory ruling only matters to the units it was ever actually shown to — the same
+// whole-word test the prompt itself uses (relevantDecisionMemory/termAppearsIn), so a term that
+// changes never sweeps the whole book, only the units whose prompt genuinely contained it.
+function invalidateForDecisionMemoryChange(term){
+  let count = 0;
+  (doc?.units || []).forEach(u => {
+    const relevantTextFor = { parafrasa: u.source, translation: u.source + '\n' + u.parafrasa.text };
+    ['parafrasa', 'translation'].forEach(f => {
+      const w = u[f];
+      if(['approved', 'pending', 'sent'].includes(w.status) && termAppearsIn(relevantTextFor[f], term)){
+        w.status = 'stale';
+        invalidateDownstream(u, f);
+        count++;
+      }
+    });
+  });
+  return count;
 }
 
 function anyApproved(field){ return (doc?.units || []).some(u => u[field].status === 'approved'); }
@@ -874,6 +955,16 @@ function renderPhaseNav(){
 // ---- Rendering ---------------------------------------------------------------
 function currentChapters(){ return [...new Set((doc?.units || []).map(u => u.chapter))]; }
 function workField(u){ return u[PHASES[mode].field]; }
+
+// A unit that has ever been cleared by a real full paraphrase — because it graded B/C, or because
+// an editor asked for one manually on a unit that looked fine — must never quietly drop back onto
+// the cheap Meaning Check path just because it gets reopened or re-selected later. Both
+// needsFullParaphrase (escalation not yet resolved) and clearanceSource (escalation already
+// resolved) route through here, so renderPrompt and the paste parser can never disagree about
+// which prompt format a given unit is on.
+function unitIsEscalated(u){
+  return !!(u?.parafrasa?.needsFullParaphrase || u?.parafrasa?.clearanceSource === 'full_paraphrase');
+}
 
 function filteredUnits(){
   if(!doc) return [];
@@ -1129,7 +1220,13 @@ const FINAL_FIELD_META = {
   backTranslation: { label: 'BACK TRANSLATION', cls: 'reference', kind: 'backtranslation' }
 };
 function finalFieldBlock(u, fieldKey){
-  const meta = FINAL_FIELD_META[fieldKey];
+  // A v2 unit cleared zero-touch never went through a full paraphrase at all — labeling that one
+  // sentence "PARAPHRASE" in Final Review reads as a broken/truncated paraphrase, not the compact
+  // clearance it actually is. The label has to follow what the field actually holds, not just
+  // which phase produced it.
+  const meta = fieldKey === 'parafrasa' && u.parafrasa.isMeaningCheck
+    ? { ...FINAL_FIELD_META.parafrasa, label: 'MEANING CHECK' }
+    : FINAL_FIELD_META[fieldKey];
   const text = u[fieldKey].text;
   if(editingFinalId === u.id && editingFinalField === fieldKey){
     return `<div class="unit-field kind-${meta.kind}"><small>${meta.label} (editing)</small><textarea class="edit-textarea" id="editFinalTextarea" dir="auto">${escapeHtml(text)}</textarea></div>
@@ -1193,7 +1290,8 @@ function renderUnitList(){
     const w = workField(u);
     const cfg = PHASES[mode];
     const isSelectable = w.status === 'none' || w.status === 'rejected' || w.status === 'stale';
-    const label = { parafrasa: 'PARAPHRASE', translation: 'TRANSLATION', backtranslation: 'BACK TRANSLATION' }[mode];
+    const label = mode === 'parafrasa' && w.isMeaningCheck ? 'MEANING CHECK'
+      : { parafrasa: 'PARAPHRASE', translation: 'TRANSLATION', backtranslation: 'BACK TRANSLATION' }[mode];
     const approveLabel = { parafrasa: '✓ Approve paraphrase', translation: '✓ Approve translation', backtranslation: '✓ Approve back translation' }[mode];
     const refLabel = { translation: 'APPROVED PARAPHRASE', backtranslation: 'APPROVED TRANSLATION' }[mode];
     const refText = mode === 'translation' ? u.parafrasa.text : mode === 'backtranslation' ? u.translation.text : '';
@@ -1211,6 +1309,12 @@ function renderUnitList(){
       ${refLabel ? fieldBlock(refLabel, refText, 'reference', mode === 'translation' ? 'parafrasa' : 'translation') : ''}
       ${w.status === 'stale' ? `<p class="stale-banner">${icon('warn')}${statusLabel('stale')}. The text below is outdated. Pick this unit above to send it again.</p>` : ''}
       ${w.grade === 'C' ? `<p class="grade-c-banner">${icon('warn')}Chatbot flagged low confidence on this ${label.toLowerCase()}, worth a closer read.</p>` : ''}
+      ${w.needsFullParaphrase ? `<p class="grade-c-banner">${icon('warn')}Meaning Check only (Grade ${escapeHtml(w.grade || '')}) — a confidence sentence alone isn't proof enough here. <button class="text-button" data-escalate="${escapeHtml(u.id)}">Jana Parafrasa Penuh →</button></p>`
+        // Grade A units that cleared zero-touch (or after answering [Q]) never show the button
+        // above, but a suspicious editor still needs a way in — without this, "expand any A unit
+        // any time" (the whole point of Meaning Check keeping a human override) would be a claim
+        // the UI couldn't actually back up.
+        : (w.isMeaningCheck && w.clearanceSource !== 'full_paraphrase' ? `<button class="text-button edit-button" data-escalate="${escapeHtml(u.id)}">✎ Minta parafrasa penuh</button>` : '')}
       ${editingUnitId === u.id
         ? `<div class="unit-field kind-${mode}"><small>${label} (editing)</small><textarea class="edit-textarea" id="editTextarea" dir="auto">${escapeHtml(w.text)}</textarea></div>
            <div class="unit-actions"><button class="text-button" data-canceledit="${escapeHtml(u.id)}">Cancel</button><button class="approve-button" data-saveedit="${escapeHtml(u.id)}">✓ Save</button></div>`
@@ -1340,6 +1444,40 @@ Return EXACTLY this format, once per unit, in the same order, using the same [UN
 `;
 }
 
+// FASA 1 output contract for workflow_version 2 books (docs/NON_NEGOTIABLE_SPEC.md §7). Replaces
+// the full paraphrase with a single compact sentence proving the meaning was actually understood
+// — cheaper to produce and read, but still gated by the same human-approval requirement. A unit
+// graded B or C never gets silently trusted on that one sentence alone: it's auto-escalated to the
+// old full-paraphrase prompt (renderPromptParafrasa, unchanged) via the "Jana Parafrasa Penuh"
+// button, so "confident enough to skip the full paraphrase" is only ever true for grade A.
+// Deliberately reuses CLARIFY_FORMAT_NOTE verbatim rather than writing a new instruction — a looser
+// ad hoc wording was tested live and produced [Q]s the review UI's fixed Ya/Tidak/Pembetulan
+// buttons couldn't cleanly answer (an open "A atau B?" choice, not a proposed interpretation to
+// confirm).
+function renderPromptParafrasaMeaningCheck(sel){
+  const srcLang = (doc?.sourceLang || '').trim();
+  if(!srcLang) return null;
+  const body = sel.map(u => `[UNIT: ${u.id}]\n${u.source}`).join('\n\n');
+  return `YOU ARE: ${srcLang} language editor verifying you understand each unit's meaning before any translation begins. Do NOT translate. Do NOT write a full paraphrase or rephrase the passage. Do NOT change the author's position, meaning, or tone.
+${footnoteNoteFor(sel)}${bookProfileBlockFor()}${memoryBlockFor(sel.map(u => u.source).join('\n'))}
+For EACH unit below, write ONE concise sentence (25-40 words) in ${srcLang} stating the unit's critical/core meaning — just enough to prove you understood what happens or is meant, not a rewrite of the passage. ${CLARIFY_FORMAT_NOTE} ${CONFIDENCE_GRADE_NOTE} ${AI_SOURCE_NOTE}
+
+UNITS:
+${body}
+
+Return EXACTLY this format, once per unit, in the same order, using the same [UNIT: id] markers:
+[UNIT: <id>]
+[MEANING CHECK]
+...
+[CONFIDENCE]
+...
+[AI_NAME]
+...
+[NOTES]
+...
+`;
+}
+
 function renderPromptTranslation(sel){
   const lang = (doc?.targetLang || '').trim();
   if(!lang) return null;
@@ -1450,7 +1588,8 @@ function renderPrompt(){
   renderBatchAccordion();
   const sel = (doc?.units || []).filter(u => selected.has(u.id));
   const stats = batchStatsFor(sel);
-  $('selectedCount').textContent = `${sel.length} selected · ${stats.chars}/${BATCH_MAX_CHARS} chars · ${stats.sentences}/${BATCH_MAX_SENTENCES} sentences`;
+  const limA = currentBatchLimits();
+  $('selectedCount').textContent = `${sel.length} selected · ${stats.chars}/${limA.chars} chars · ${stats.sentences}/${limA.sentences} sentences`;
   // Marking a batch "sent" clears the selection, but blanking the prompt with it would strand an
   // editor whose clipboard copy failed or who needs to paste it a second time. The last prompt
   // stays on screen until a new selection replaces it.
@@ -1465,7 +1604,14 @@ function renderPrompt(){
     $('promptSummary').hidden = true;
     return;
   }
-  const promptText = mode === 'parafrasa' ? renderPromptParafrasa(sel)
+  // A unit the last Meaning Check reply flagged B/C (or that the editor manually reopened via
+  // "Jana Parafrasa Penuh") stays on the old full-paraphrase prompt even on a v2 book — escalation
+  // is per-unit, not per-book, so mixing an escalated unit into an otherwise fresh batch always
+  // falls back to the full prompt for the whole selection rather than silently mixing formats.
+  const parafrasaBuilder = mode === 'parafrasa' && doc?.workflowVersion === 2 && sel.length && !sel.some(unitIsEscalated)
+    ? renderPromptParafrasaMeaningCheck
+    : renderPromptParafrasa;
+  const promptText = mode === 'parafrasa' ? parafrasaBuilder(sel)
     : mode === 'translation' ? renderPromptTranslation(sel)
     : renderPromptBackTranslation(sel);
   $('promptOut').value = promptText;
@@ -1604,6 +1750,7 @@ function renderSourceLangSuggest(){
 // unchecked so the editor can just run "Select all filtered" again for the next batch.
 $('selectAllBtn').onclick = () => {
   $('batchWarning').textContent = '';
+  const limB = currentBatchLimits();
   let stats = batchStatsFor((doc?.units || []).filter(u => selected.has(u.id)));
   let skipped = 0, picked = 0;
   for(const u of filteredUnits()){
@@ -1611,16 +1758,21 @@ $('selectAllBtn').onclick = () => {
     if(s !== 'none' && s !== 'rejected') continue;
     if(selected.has(u.id)) continue;
     const sentences = countSentences(u.source);
-    if(stats.chars + u.source.length > BATCH_MAX_CHARS || stats.sentences + sentences > BATCH_MAX_SENTENCES){ skipped++; continue; }
+    if(stats.chars + u.source.length > limB.chars || stats.sentences + sentences > limB.sentences){ skipped++; continue; }
     selected.add(u.id);
     stats.chars += u.source.length; stats.sentences += sentences;
     picked++;
   }
   // Naming the actual outcome (not just the cap being hit) means the editor never has to
-  // recount the checkboxes themselves to know what a click just did.
+  // recount the checkboxes themselves to know what a click just did. A silent "0 unit(s)" reads
+  // as "the whole book is done" — call out a leftover status filter by name so that reading
+  // doesn't stick when it's actually just filtering everything out.
+  const statusF = $('statusFilter').value;
   $('batchWarning').textContent = skipped
-    ? `All filtered selected up to the batch limit (${BATCH_MAX_CHARS} chars / ${BATCH_MAX_SENTENCES} sentences): ${picked} unit(s) selected, ${skipped} left over. Process this batch, then run it again.`
-    : `All filtered selected: ${picked} unit(s).`;
+    ? `All filtered selected up to the batch limit (${limB.chars} chars / ${limB.sentences} sentences): ${picked} unit(s) selected, ${skipped} left over. Process this batch, then run it again.`
+    : picked === 0 && statusF
+      ? `0 unit(s) match the current filter (${statusLabel(statusF)}). Clear the status filter above to see other unstarted units.`
+      : `All filtered selected: ${picked} unit(s).`;
   renderUnitList(); renderPrompt(); renderSourceLangSuggest();
 };
 // A smaller, round-trip-sized pick — "Select all filtered" deliberately fills to the hard cap,
@@ -1628,6 +1780,7 @@ $('selectAllBtn').onclick = () => {
 const SUGGESTED_BATCH_UNITS = 5;
 $('suggestBatchBtn').onclick = () => {
   $('batchWarning').textContent = '';
+  const limC = currentBatchLimits();
   let stats = batchStatsFor((doc?.units || []).filter(u => selected.has(u.id)));
   let picked = 0;
   for(const u of filteredUnits()){
@@ -1636,7 +1789,7 @@ $('suggestBatchBtn').onclick = () => {
     if(s !== 'none' && s !== 'rejected') continue;
     if(selected.has(u.id)) continue;
     const sentences = countSentences(u.source);
-    if(stats.chars + u.source.length > BATCH_MAX_CHARS || stats.sentences + sentences > BATCH_MAX_SENTENCES) break;
+    if(stats.chars + u.source.length > limC.chars || stats.sentences + sentences > limC.sentences) break;
     selected.add(u.id);
     stats.chars += u.source.length; stats.sentences += sentences;
     picked++;
@@ -1655,6 +1808,7 @@ $('suggestBatchBtn').onclick = () => {
 const PILOT_BATCH_UNITS = 2;
 $('pilotBatchBtn').onclick = () => {
   $('batchWarning').textContent = '';
+  const limD = currentBatchLimits();
   let stats = batchStatsFor((doc?.units || []).filter(u => selected.has(u.id)));
   let picked = 0;
   for(const u of filteredUnits()){
@@ -1663,7 +1817,7 @@ $('pilotBatchBtn').onclick = () => {
     if(s !== 'none' && s !== 'rejected') continue;
     if(selected.has(u.id)) continue;
     const sentences = countSentences(u.source);
-    if(stats.chars + u.source.length > BATCH_MAX_CHARS || stats.sentences + sentences > BATCH_MAX_SENTENCES) break;
+    if(stats.chars + u.source.length > limD.chars || stats.sentences + sentences > limD.sentences) break;
     selected.add(u.id);
     stats.chars += u.source.length; stats.sentences += sentences;
     picked++;
@@ -1708,9 +1862,10 @@ $('unitList').addEventListener('change', e => {
   if(cb.checked){
     const u = doc.units.find(x => x.id === cb.dataset.select);
     const stats = batchStatsFor((doc?.units || []).filter(x => selected.has(x.id)));
-    if(stats.chars + u.source.length > BATCH_MAX_CHARS || stats.sentences + countSentences(u.source) > BATCH_MAX_SENTENCES){
+    const limE = currentBatchLimits();
+    if(stats.chars + u.source.length > limE.chars || stats.sentences + countSentences(u.source) > limE.sentences){
       cb.checked = false;
-      $('batchWarning').textContent = `Adding this unit would exceed the batch limit (${BATCH_MAX_CHARS} chars / ${BATCH_MAX_SENTENCES} sentences). Process the current batch first.`;
+      $('batchWarning').textContent = `Adding this unit would exceed the batch limit (${limE.chars} chars / ${limE.sentences} sentences). Process the current batch first.`;
       return;
     }
     selected.add(cb.dataset.select);
@@ -1726,7 +1881,21 @@ $('unitList').addEventListener('click', e => {
   const editFinalBtn = t('editfinal'), saveFinalEditBtn = t('savefinaledit'), cancelFinalEditBtn = t('cancelfinaledit');
   const toggleDiffBtn = t('togglediff'), gotoBtBtn = t('gotobt');
   const clarifyBtn = t('clarify'), clarifyCorrectBtn = t('clarifycorrect'), cancelClarifyBtn = t('cancelclarify'), saveClarifyBtn = t('saveclarify');
+  const escalateBtn = t('escalate');
 
+  if(escalateBtn){
+    const u = doc.units.find(x => x.id === escalateBtn.dataset.escalate);
+    // Stamping needsFullParaphrase here (not just selecting the unit) is what makes this button
+    // work even on an already-approved, zero-touch Grade A unit: renderPrompt and the paste parser
+    // both key off unitIsEscalated(), so this is the one flag that has to be true before either of
+    // them will treat this unit as "on the full paraphrase path" rather than Meaning Check.
+    if(u) u.parafrasa.needsFullParaphrase = true;
+    selected.clear();
+    selected.add(escalateBtn.dataset.escalate);
+    save(); renderUnitList(); renderPrompt(); renderSourceLangSuggest();
+    $('promptOut')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
   if(clarifyBtn){
     const [unitId, field, qid, answer] = clarifyBtn.dataset.clarify.split('|');
     const u = doc.units.find(x => x.id === unitId);
@@ -1815,7 +1984,15 @@ $('unitList').addEventListener('click', e => {
   if(approveBtn){
     const u = doc.units.find(x => x.id === approveBtn.dataset.approve);
     if(u) workField(u).status = 'approved';
-    save(); renderAll();
+    save();
+    // The status filter gets set to "pending" the moment a batch is processed, so the editor
+    // lands on exactly the units they need to review. Once that batch is fully approved/rejected,
+    // the filter is stale — it now matches nothing, and "Select all filtered" would silently
+    // return 0 units for the NEXT batch until someone notices and clears it by hand.
+    if($('statusFilter').value === 'pending' && !doc.units.some(x => workField(x).status === 'pending')){
+      $('statusFilter').value = '';
+    }
+    renderAll();
   }
   if(rejectBtn){
     const u = doc.units.find(x => x.id === rejectBtn.dataset.reject);
@@ -2061,14 +2238,21 @@ $('processBtn').onclick = () => {
   if(!raw){ $('parseError').textContent = "Paste the chatbot's reply first."; return; }
   const chunks = parseBatchResponse(raw);
   if(!Object.keys(chunks).length){ $('parseError').textContent = 'No [UNIT: id] markers found. Make sure the chatbot kept the requested format.'; return; }
-  const fieldLabel = { parafrasa: 'PARAPHRASE', translation: 'TRANSLATION', backtranslation: 'BACK_TRANSLATION' }[mode];
   const targetField = PHASES[mode].field;
-  const aiSourceOverrideValue = $('aiSourceOverride').value;
 
   // A chatbot can cut out mid-reply and still return something that parses — the first unit, or a
   // bare "[UNIT: U0001]" with no body. Silently accepting that leaves the rest of the batch blank
   // and looking merely "not started", so a truncated answer is refused before anything is written.
   const outstanding = doc.units.filter(u => u[targetField].status === 'sent');
+  // Mirrors the same escalation check renderPrompt used to build the prompt in the first place —
+  // whichever prompt was actually sent (Meaning Check or the old full paraphrase) is the one whose
+  // reply is coming back, so the parser has to expect the matching label.
+  const isMeaningCheckReply = mode === 'parafrasa' && doc?.workflowVersion === 2
+    && !(outstanding.length && outstanding.every(unitIsEscalated));
+  const fieldLabel = mode === 'parafrasa'
+    ? (isMeaningCheckReply ? 'MEANING CHECK' : 'PARAPHRASE')
+    : { translation: 'TRANSLATION', backtranslation: 'BACK_TRANSLATION' }[mode];
+  const aiSourceOverrideValue = $('aiSourceOverride').value;
   if(outstanding.length){
     const answered = outstanding.filter(u => {
       const chunk = chunks[u.id];
@@ -2093,7 +2277,32 @@ $('processBtn').onclick = () => {
     // The editor's own dropdown always wins over whatever the chatbot self-reports — they know
     // for certain which one they pasted from, the model is only guessing at its own identity.
     const aiSource = aiSourceOverrideValue || extractLabeled(chunk, 'AI_NAME').trim() || null;
-    u[targetField] = { text, notes, clarifications, grade, aiSource, status: 'pending' };
+    // Meaning Check reply (workflow_version 2, Fasa 1): the system decides whether this unit is
+    // trusted on that one sentence alone, never the editor's default click-through habit. Grade A
+    // with nothing to ask is approved immediately — zero-touch, per docs/NON_NEGOTIABLE_SPEC.md
+    // §7's Meaning Clearance addendum. Grade B/C is auto-escalated to the old full-paraphrase
+    // prompt regardless of what the editor does next; "needsFullParaphrase" is what renderPrompt
+    // and the unit card both check to keep pointing at that escalation until it's resolved.
+    const isMeaningCheck = fieldLabel === 'MEANING CHECK';
+    const needsFullParaphrase = isMeaningCheck && (grade === 'B' || grade === 'C');
+    const status = isMeaningCheck && grade === 'A' && !clarifications.length ? 'approved' : 'pending';
+    // Once a unit is settled by a real full paraphrase (v2 escalation resolved, or a plain v1
+    // book), that stays the authoritative source of clearance for this unit from now on — even a
+    // later Grade A on a regenerated Meaning Check must not be read as "back to zero-touch"
+    // without the editor explicitly choosing that (see unitIsEscalated).
+    const clearanceSource = isMeaningCheck ? 'meaning_check' : (doc?.workflowVersion === 2 && mode === 'parafrasa' ? 'full_paraphrase' : undefined);
+    // Recorded only for phases the prompt actually hands the Book Profile to (see PHASES[mode]
+    // .needsBookProfile) — this is what invalidateForProfileChange compares a later re-approval's
+    // bumped version against, so a unit never gets flagged stale over a Guide it was never shown.
+    const bookProfileVersion = PHASES[mode].needsBookProfile ? (doc?.bookProfile?.version || 1) : undefined;
+    u[targetField] = { text, notes, clarifications, grade, aiSource, status, isMeaningCheck, needsFullParaphrase, clearanceSource, bookProfileVersion };
+    // Every other way to overwrite a field that downstream stages may already be built on (Edit,
+    // Reject) cascades through invalidateDownstream — a no-op when nothing downstream exists yet,
+    // so it's safe to call unconditionally here too. Needed because copyPromptBtn always stamps
+    // 'sent' before a reply is pasted, so by the time this runs the field's status is never still
+    // 'approved' to check against — the only reliable signal is invalidateDownstream's own check of
+    // what's actually downstream, not what this field's status happened to be a moment ago.
+    invalidateDownstream(u, targetField);
     if(!firstAppliedId) firstAppliedId = id;
     applied++;
   });
@@ -2120,6 +2329,7 @@ $('processBtn').onclick = () => {
 
 // Computed from the real clock, not a hardcoded string — the year is always correct on whatever
 // day the page happens to load, with nothing to remember to bump every January.
-$('copyrightNotice').textContent = `© ${new Date().getFullYear()} Adjung Press`;
+// The business as registered with SSM (Registration of Businesses Act 1956), with the registration number printed as on the certificate.
+$('copyrightNotice').textContent = `© ${new Date().getFullYear()} Adjung Press Platform (202603277981 (PG0594995-P)). All rights reserved.`;
 
 renderAll();
